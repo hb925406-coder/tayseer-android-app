@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tayseer.app.data.AppDatabase
 import com.tayseer.app.data.AttendanceRecord
+import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Level
 import com.tayseer.app.data.Student
 import com.tayseer.app.util.StudentImporter
@@ -41,6 +42,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun getStudentsForCurrentLevel(levelId: Long) = dao.getStudentsByLevel(levelId)
 
     fun getAttendanceForDate(date: String) = dao.getAttendanceByDate(date)
+
+    fun getStudentEvaluations(studentId: Long) = dao.getEvaluationsByStudent(studentId)
 
     fun addLevel(name: String, section: String = "") {
         viewModelScope.launch {
@@ -84,6 +87,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 isResolved = status in listOf("حاضر", "غائب بعذر")
             )
             dao.insertAttendanceList(listOf(record))
+        }
+    }
+
+    fun addEvaluation(studentId: Long, type: String, note: String = "") {
+        viewModelScope.launch {
+            dao.insertEvaluation(
+                EvaluationRecord(
+                    studentId = studentId,
+                    date = _currentDate.value,
+                    type = type,
+                    note = note
+                )
+            )
         }
     }
 
