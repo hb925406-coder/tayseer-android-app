@@ -13,7 +13,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -260,7 +264,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
         }
     }
 
-    // نافذة التقييم اليومي للطالب
     evaluatingStudent?.let { student ->
         var noteText by remember { mutableStateOf("") }
         val evaluationsList by viewModel.getStudentEvaluations(student.id).collectAsState(initial = emptyList())
@@ -352,7 +355,7 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
                     )
 
                     if (evaluationsList.isNotEmpty()) {
-                        Divider(modifier = Modifier.padding(vertical = 4.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text("التقييمات السابقة المسجلة:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         LazyColumn(modifier = Modifier.heightIn(max = 120.dp)) {
                             items(evaluationsList) { eval ->
@@ -549,7 +552,6 @@ fun StudentAttendanceCard(
                     )
                 }
 
-                // زر فتح التقييم للطالب
                 OutlinedButton(
                     onClick = onOpenEvaluation,
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
@@ -563,7 +565,6 @@ fun StudentAttendanceCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // الحالات الست للحضور
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
