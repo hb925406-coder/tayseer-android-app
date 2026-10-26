@@ -1,8 +1,12 @@
 package com.tayseer.app
 
+import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -57,6 +62,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TayseerMainScreen(viewModel: MainViewModel) {
+    val context = LocalContext.current
     val levels by viewModel.levels.collectAsState(initial = emptyList())
     val selectedLevelId by viewModel.selectedLevelId.collectAsState()
     val currentDate by viewModel.currentDate.collectAsState()
@@ -76,6 +82,23 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
     var showAddStudentDialog by remember { mutableStateOf(false) }
     var showAlertsDialog by remember { mutableStateOf(false) }
 
+    // لاقط اختيار الملفات من الهاتف
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            if (selectedLevelId != null) {
+                viewModel.importStudentsFromFile(it, selectedLevelId!!) { count ->
+                    Toast.makeText(
+                        context,
+                        "تم استيراد $count طالب بنجاح!",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -87,6 +110,13 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
                     )
                 },
                 actions = {
+                    if (selectedLevelId != null) {
+                        IconButton(onClick = {
+                            filePickerLauncher.launch(arrayOf("text/*", "application/*"))
+                        }) {
+                            Icon(Icons.Default.UploadFile, contentDescription = "استيراد طلاب")
+                        }
+                    }
                     BadgedBox(
                         badge = {
                             if (unresolvedAlerts.isNotEmpty()) {
@@ -203,7 +233,7 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "لا يوجد طلاب في هذه الحلقة.\nاضغط على علامة (+) بالأسفل لإضافة طلاب.",
+                            "لا يوجد طلاب في هذه الحلقة.\nاضغط على أيقونة الملف بالأعلى لاستيراد قائمة، أو علامة (+) بالأسفل لإضافة طالب يدوياً.",
                             textAlign = TextAlign.Center,
                             color = Color.Gray
                         )
