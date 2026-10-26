@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tayseer.app.data.AttendanceRecord
+import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Level
 import com.tayseer.app.data.Student
 import com.tayseer.app.ui.MainViewModel
@@ -81,8 +82,8 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
     var showAddLevelDialog by remember { mutableStateOf(false) }
     var showAddStudentDialog by remember { mutableStateOf(false) }
     var showAlertsDialog by remember { mutableStateOf(false) }
+    var evaluatingStudent by remember { mutableStateOf<Student?>(null) }
 
-    // لاقط اختيار الملفات من الهاتف
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -153,7 +154,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
-            // شريط التاريخ والإحصائيات
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -173,7 +173,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // قسم اختيار أو إضافة الحلقة / الفصل
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -224,7 +223,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // قائمة الطلاب والحضور
                 if (students.isEmpty()) {
                     Box(
                         modifier = Modifier
@@ -250,6 +248,9 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
                                 currentStatus = currentStatus,
                                 onSelectStatus = { status ->
                                     viewModel.recordAttendance(student.id, status)
+                                },
+                                onOpenEvaluation = {
+                                    evaluatingStudent = student
                                 }
                             )
                         }
@@ -259,7 +260,125 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
         }
     }
 
-    // نافذة إضافة حلقة جديدة
+    // نافذة التقييم اليومي للطالب
+    evaluatingStudent?.let { student ->
+        var noteText by remember { mutableStateOf("") }
+        val evaluationsList by viewModel.getStudentEvaluations(student.id).collectAsState(initial = emptyList())
+
+        AlertDialog(
+            onDismissRequest = { evaluatingStudent = null },
+            title = { Text("تقييم الطالب: ${student.name}") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("اختر نوع التقييم لليوم:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.addEvaluation(student.id, "حفظه", noteText)
+                                Toast.makeText(context, "تم رصد تقييم: حفظه", Toast.LENGTH_SHORT).show()
+                                evaluatingStudent = null
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                        ) {
+                            Text("حفظه", fontSize = 11.sp)
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.addEvaluation(student.id, "لم يحفظ", noteText)
+                                Toast.makeText(context, "تم رصد تقييم: لم يحفظ", Toast.LENGTH_SHORT).show()
+                                evaluatingStudent = null
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))
+                        ) {
+                            Text("لم يحفظ", fontSize = 11.sp)
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.addEvaluation(student.id, "مميز", noteText)
+                                Toast.makeText(context, "تم رصد تقييم: مميز", Toast.LENGTH_SHORT).show()
+                                evaluatingStudent = null
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0277BD))
+                        ) {
+                            Text("مميز", fontSize = 11.sp)
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.addEvaluation(student.id, "مؤدب", noteText)
+                                Toast.makeText(context, "تم رصد تقييم: مؤدب", Toast.LENGTH_SHORT).show()
+                                evaluatingStudent = null
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00838F))
+                        ) {
+                            Text("مؤدب", fontSize = 11.sp)
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.addEvaluation(student.id, "نسيان الكتب", noteText)
+                                Toast.makeText(context, "تم رصد: نسيان الكتب", Toast.LENGTH_SHORT).show()
+                                evaluatingStudent = null
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF6C00))
+                        ) {
+                            Text("نسي الكتب", fontSize = 10.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    OutlinedTextField(
+                        value = noteText,
+                        onValueChange = { noteText = it },
+                        label = { Text("ملاحظة إضافية (اختياري)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    if (evaluationsList.isNotEmpty()) {
+                        Divider(modifier = Modifier.padding(vertical = 4.dp))
+                        Text("التقييمات السابقة المسجلة:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        LazyColumn(modifier = Modifier.heightIn(max = 120.dp)) {
+                            items(evaluationsList) { eval ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 2.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(eval.type, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                                    Text(eval.date, color = Color.Gray, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { evaluatingStudent = null }) {
+                    Text("إغلاق")
+                }
+            }
+        )
+    }
+
     if (showAddLevelDialog) {
         var levelName by remember { mutableStateOf("") }
         AlertDialog(
@@ -294,7 +413,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
         )
     }
 
-    // نافذة إضافة طالب جديد
     if (showAddStudentDialog && selectedLevelId != null) {
         var studentName by remember { mutableStateOf("") }
         var parentPhone by remember { mutableStateOf("") }
@@ -343,7 +461,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
         )
     }
 
-    // نافذة متابعة التنبيهات والأعذار
     if (showAlertsDialog) {
         AlertDialog(
             onDismissRequest = { showAlertsDialog = false },
@@ -395,7 +512,8 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
 fun StudentAttendanceCard(
     student: Student,
     currentStatus: String,
-    onSelectStatus: (String) -> Unit
+    onSelectStatus: (String) -> Unit,
+    onOpenEvaluation: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -409,25 +527,38 @@ fun StudentAttendanceCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = student.name,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-                Text(
-                    text = currentStatus,
-                    color = when (currentStatus) {
-                        "حاضر" -> Color(0xFF00897B)
-                        "غائب" -> MaterialTheme.colorScheme.error
-                        "متأخر" -> Color(0xFFF57C00)
-                        "مستأذن" -> Color(0xFF1976D2)
-                        "غائب بعذر" -> Color(0xFF7B1FA2)
-                        "هارب" -> Color(0xFFC2185B)
-                        else -> Color.Gray
-                    },
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp
-                )
+                Column {
+                    Text(
+                        text = student.name,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                    Text(
+                        text = currentStatus,
+                        color = when (currentStatus) {
+                            "حاضر" -> Color(0xFF00897B)
+                            "غائب" -> MaterialTheme.colorScheme.error
+                            "متأخر" -> Color(0xFFF57C00)
+                            "مستأذن" -> Color(0xFF1976D2)
+                            "غائب بعذر" -> Color(0xFF7B1FA2)
+                            "هارب" -> Color(0xFFC2185B)
+                            else -> Color.Gray
+                        },
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp
+                    )
+                }
+
+                // زر فتح التقييم للطالب
+                OutlinedButton(
+                    onClick = onOpenEvaluation,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color(0xFFF57C00))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("تقييم", fontSize = 12.sp)
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
