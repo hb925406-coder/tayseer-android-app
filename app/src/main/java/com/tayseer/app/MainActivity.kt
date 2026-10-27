@@ -13,12 +13,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -26,6 +30,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -33,6 +39,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tayseer.app.data.AppDatabase
 import com.tayseer.app.data.AttendanceRecord
 import com.tayseer.app.data.Student
+import com.tayseer.app.data.User
 import com.tayseer.app.ui.MainViewModel
 import com.tayseer.app.util.StudentImporter
 import kotlinx.coroutines.launch
@@ -56,8 +63,91 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val viewModel: MainViewModel = viewModel(factory = viewModelFactory)
-                    TayseerMainScreen(viewModel = viewModel)
+                    val currentUser by viewModel.currentUser.collectAsState()
+
+                    if (currentUser == null) {
+                        LoginScreen(viewModel = viewModel)
+                    } else {
+                        TayseerMainScreen(viewModel = viewModel, user = currentUser!!)
+                    }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun LoginScreen(viewModel: MainViewModel) {
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    val loginError by viewModel.loginError.collectAsState()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "تطبيق تيسير",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "تسجيل الدخول المحلي",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.outline
+                )
+
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("اسم المستخدم") },
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("كلمة المرور") },
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (loginError != null) {
+                    Text(
+                        text = loginError!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+
+                Button(
+                    onClick = { viewModel.login(username, password) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("دخول")
+                }
+
+                Text(
+                    text = "للتجربة: اسم المستخدم admin وكلمة المرور 123456",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
             }
         }
     }
@@ -65,7 +155,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TayseerMainScreen(viewModel: MainViewModel) {
+fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -116,7 +206,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
         }
     }
 
-    // دالة إنشاء نص تقرير اليوم ومشاركته
     fun shareDailyReport() {
         val totalCount = filteredStudents.size
         val presentCount = attendanceRecords.count { it.status == "حاضر" }
@@ -139,7 +228,7 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
             filteredStudents.forEachIndexed { index, student ->
                 val record = attendanceRecords.find { it.studentId == student.id }
                 val status = record?.status ?: "لم يُسجل"
-                appendLine("${index + 1}. ${student.name} : $status")
+                appendLine("${index + 1}. ${student.name} :$status")
             }
         }
 
@@ -155,7 +244,15 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("تطبيق تيسير") },
+                title = {
+                    Column {
+                        Text("تطبيق تيسير")
+                        Text(
+                            text = "المستخدم: ${user.username} (${if (user.role == "ADMIN") "إدارة" else "معلم"})",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                },
                 actions = {
                     IconButton(onClick = { shareDailyReport() }) {
                         Icon(imageVector = Icons.Default.Share, contentDescription = "مشاركة التقرير")
@@ -173,17 +270,23 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
                         }
                     }
 
-                    TextButton(onClick = {
-                        excelPickerLauncher.launch(
-                            arrayOf(
-                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                "application/vnd.ms-excel",
-                                "text/comma-separated-values",
-                                "text/csv"
+                    if (user.role == "ADMIN") {
+                        TextButton(onClick = {
+                            excelPickerLauncher.launch(
+                                arrayOf(
+                                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    "application/vnd.ms-excel",
+                                    "text/comma-separated-values",
+                                    "text/csv"
+                                )
                             )
-                        )
-                    }) {
-                        Text("استيراد Excel", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }) {
+                            Text("استيراد Excel", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                    }
+
+                    IconButton(onClick = { viewModel.logout() }) {
+                        Icon(imageVector = Icons.Default.ExitToApp, contentDescription = "تسجيل خروج")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -193,8 +296,10 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddStudentDialog = true }) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "إضافة طالب")
+            if (user.role == "ADMIN") {
+                FloatingActionButton(onClick = { showAddStudentDialog = true }) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = "إضافة طالب")
+                }
             }
         }
     ) { innerPadding ->
@@ -502,30 +607,4 @@ fun StudentRowCard(
                         onClick = { onMarkAttendance(status) },
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                     ) {
-                        Text(status, style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text("التقييم السريع:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                val evals = listOf("حفظه", "لم يحفظ", "مميز", "مؤدب", "نسيان الكتب")
-                evals.forEach { eval ->
-                    FilledTonalButton(
-                        onClick = { onMarkEvaluation(eval) },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Text(eval, style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            }
-        }
-    }
-}
+                        Text(status, style = MaterialTheme
