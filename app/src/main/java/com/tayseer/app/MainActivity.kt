@@ -35,6 +35,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tayseer.app.data.AppDatabase
 import com.tayseer.app.data.AttendanceRecord
+import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Student
 import com.tayseer.app.data.User
 import com.tayseer.app.ui.MainViewModel
@@ -62,10 +63,10 @@ class MainActivity : ComponentActivity() {
                     val viewModel: MainViewModel = viewModel(factory = viewModelFactory)
                     val currentUser by viewModel.currentUser.collectAsState()
 
-                    if (currentUser == null) {
-                        LoginScreen(viewModel = viewModel)
-                    } else {
-                        TayseerMainScreen(viewModel = viewModel, user = currentUser!!)
+                    when {
+                        currentUser == null -> LoginScreen(viewModel = viewModel)
+                        currentUser!!.role == "PARENT" -> ParentDashboardScreen(viewModel = viewModel, user = currentUser!!)
+                        else -> TayseerMainScreen(viewModel = viewModel, user = currentUser!!)
                     }
                 }
             }
@@ -139,10 +140,133 @@ fun LoginScreen(viewModel: MainViewModel) {
                 }
 
                 Text(
-                    text = "حساب الإدارة: admin / كلمة المرور: 123456\nحساب المعلم: teacher / كلمة المرور: 123456",
+                    text = "الإدارة: admin / المعلم: teacher / ولي الأمر: parent\nكلمة المرور للجميع: 123456",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ParentDashboardScreen(viewModel: MainViewModel, user: User) {
+    val parentStudent by viewModel.parentStudent.collectAsState()
+    val attendanceList by viewModel.parentAttendance.collectAsState()
+    val evaluationList by viewModel.parentEvaluations.collectAsState()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("بوابة ولي الأمر")
+                        Text(
+                            text = "المستخدم: ${user.username}",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                },
+                actions = {
+                    TextButton(onClick = { viewModel.logout() }) {
+                        Text("خروج", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "بيانات الطالب",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "الاسم: ${parentStudent?.name ?: "جاري التحميل..."}",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "الحلقة: ${parentStudent?.section ?: "غير محدد"}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
+            Text("سجل الحضور الأخير", style = MaterialTheme.typography.titleSmall)
+            if (attendanceList.isEmpty()) {
+                Text("لا توجد سجلات حضور مسجلة حتى الآن", style = MaterialTheme.typography.bodySmall)
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(attendanceList) { record ->
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(record.date, style = MaterialTheme.typography.bodyMedium)
+                                SuggestionChip(
+                                    onClick = {},
+                                    label = { Text(record.status) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Text("سجل التقييمات والسلوك", style = MaterialTheme.typography.titleSmall)
+            if (evaluationList.isEmpty()) {
+                Text("لا توجد تقييمات مسجلة حتى الآن", style = MaterialTheme.typography.bodySmall)
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(evaluationList) { eval ->
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(eval.date, style = MaterialTheme.typography.bodyMedium)
+                                SuggestionChip(
+                                    onClick = {},
+                                    label = { Text(eval.evaluationType) }
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
