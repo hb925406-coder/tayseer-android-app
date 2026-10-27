@@ -23,7 +23,6 @@ class MainViewModel(private val dao: AppDao) : ViewModel() {
     private val gregorianFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
     val todayDateString: String = gregorianFormat.format(Date())
 
-    // التاريخ الهجري الحالي
     val todayHijriString: String = try {
         val hijrahDate = HijrahDate.now()
         val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd", Locale("ar"))
@@ -49,6 +48,10 @@ class MainViewModel(private val dao: AppDao) : ViewModel() {
 
     private val _attendanceRecords = MutableStateFlow<List<AttendanceRecord>>(emptyList())
     val attendanceRecords: StateFlow<List<AttendanceRecord>> = _attendanceRecords.asStateFlow()
+
+    // قائمة التنبيهات للحالات غير الموثقة
+    val pendingAlerts: StateFlow<List<AttendanceRecord>> = dao.getPendingAlerts()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         loadAttendanceForDate(todayDateString)
@@ -83,7 +86,8 @@ class MainViewModel(private val dao: AppDao) : ViewModel() {
                 date = _selectedDate.value,
                 status = status,
                 excuseReason = excuseReason,
-                excuseType = excuseType
+                excuseType = excuseType,
+                isResolved = (status == "حاضر" || status == "مستأذن")
             )
             dao.insertAttendance(record)
         }
@@ -95,10 +99,18 @@ class MainViewModel(private val dao: AppDao) : ViewModel() {
                 val record = AttendanceRecord(
                     studentId = student.id,
                     date = _selectedDate.value,
-                    status = "حاضر"
+                    status = "حاضر",
+                    isResolved = true
                 )
                 dao.insertAttendance(record)
             }
+        }
+    }
+
+    // توثيق العذر وإزالته من شاشة التنبيهات
+    fun resolveAlert(recordId: Long, excuseType: String, excuseReason: String) {
+        viewModelScope.launch {
+            dao.resolveAlert(recordId, excuseType, excuseReason)
         }
     }
 
