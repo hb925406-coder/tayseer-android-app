@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +27,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tayseer.app.data.AppDatabase
+import com.tayseer.app.data.AttendanceRecord
 import com.tayseer.app.data.Student
 import com.tayseer.app.ui.MainViewModel
 import com.tayseer.app.util.StudentImporter
@@ -65,16 +67,18 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
 
     val students by viewModel.students.collectAsState()
     val attendanceRecords by viewModel.attendanceRecords.collectAsState()
+    val pendingAlerts by viewModel.pendingAlerts.collectAsState()
     val displayDate by viewModel.displayDate.collectAsState()
     val isHijri by viewModel.isHijri.collectAsState()
     val selectedSection by viewModel.selectedSection.collectAsState()
 
     var showAddStudentDialog by remember { mutableStateOf(false) }
+    var showAlertsDialog by remember { mutableStateOf(false) }
+
     var newStudentName by remember { mutableStateOf("") }
     var newStudentSection by remember { mutableStateOf("") }
     var newStudentPhone by remember { mutableStateOf("") }
 
-    // مستورد ملفات الطلاب
     val excelPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -95,7 +99,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
         }
     }
 
-    // استخراج الحلقات/الأقسام
     val sections = remember(students) {
         listOf("الكل") + students.map { it.section }.filter { it.isNotBlank() }.distinct()
     }
@@ -109,6 +112,18 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
             TopAppBar(
                 title = { Text("تطبيق تيسير") },
                 actions = {
+                    IconButton(onClick = { showAlertsDialog = true }) {
+                        BadgedBox(
+                            badge = {
+                                if (pendingAlerts.isNotEmpty()) {
+                                    Badge { Text("${pendingAlerts.size}") }
+                                }
+                            }
+                        ) {
+                            Icon(imageVector = Icons.Default.Notifications, contentDescription = "التنبيهات")
+                        }
+                    }
+
                     TextButton(onClick = {
                         excelPickerLauncher.launch(
                             arrayOf(
@@ -140,7 +155,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
-            // شريط التاريخ الهجري/الميلادي وزر التبديل والتحضير الجماعي
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -180,7 +194,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // شريط تصفية الحلقات / الأقسام
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -198,7 +211,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // قائمة الطلاب
             if (filteredStudents.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -227,6 +239,41 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
                     }
                 }
             }
+        }
+
+        // نافذة التنبيهات ومتابعة الأعذار
+        if (showAlertsDialog) {
+            AlertDialog(
+                onDismissRequest = { showAlertsDialog = false },
+                title = { Text("تنبيهات الغياب والتأخر (${pendingAlerts.size})") },
+                text = {
+                    if (pendingAlerts.isEmpty()) {
+                        Text("ممتاز! لا توجد حالات غياب أو تأخر تحتاج لمتابعة.")
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 350.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(pendingAlerts, key = { it.id }) { alertRecord ->
+                                val student = students.find { it.id == alertRecord.studentId }
+                                AlertItemCard(
+                                    studentName = student?.name ?: "طالب",
+                                    record = alertRecord,
+                                    onResolve = { excuseType, reason ->
+                                        viewModel.resolveAlert(alertRecord.id, excuseType, reason)
+                                        Toast.makeText(context, "تم توثيق العذر بنجاح", Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showAlertsDialog = false }) {
+                        Text("إغلاق")
+                    }
+                }
+            )
         }
 
         // نافذة إضافة طالب يدوي
@@ -291,6 +338,47 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
 }
 
 @Composable
+fun AlertItemCard(
+    studentName: String,
+    record: AttendanceRecord,
+    onResolve: (String, String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(studentName, style = MaterialTheme.typography.titleSmall)
+                Text("${record.status} (${record.date})", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text("توثيق المتابعة بواسطة:", style = MaterialTheme.typography.labelSmall)
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                val excuseTypes = listOf("ورقة من ولي الأمر", "اتصال", "رسالة واتساب", "رسالة SMS")
+                excuseTypes.forEach { type ->
+                    OutlinedButton(
+                        onClick = { onResolve(type, "تم التوثيق عبر $type") },
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(type, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun StudentRowCard(
     student: Student,
     currentStatus: String,
@@ -302,7 +390,6 @@ fun StudentRowCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            // معلومات الطالب والحالة الحالية
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -334,7 +421,6 @@ fun StudentRowCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // الحالات الست الكاملة للحضور
             Text("تسجيل الحضور:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             Row(
                 modifier = Modifier
@@ -355,7 +441,6 @@ fun StudentRowCard(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // بنود التقييم الخمسة
             Text("التقييم السريع:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
             Row(
                 modifier = Modifier
