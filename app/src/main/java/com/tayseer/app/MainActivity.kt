@@ -19,10 +19,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -112,7 +109,6 @@ fun LoginScreen(viewModel: MainViewModel) {
                     value = username,
                     onValueChange = { username = it },
                     label = { Text("اسم المستخدم") },
-                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -121,7 +117,6 @@ fun LoginScreen(viewModel: MainViewModel) {
                     value = password,
                     onValueChange = { password = it },
                     label = { Text("كلمة المرور") },
-                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     singleLine = true,
@@ -144,7 +139,7 @@ fun LoginScreen(viewModel: MainViewModel) {
                 }
 
                 Text(
-                    text = "للتجربة: اسم المستخدم admin وكلمة المرور 123456",
+                    text = "حساب الإدارة: admin / كلمة المرور: 123456\nحساب المعلم: teacher / كلمة المرور: 123456",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -228,7 +223,7 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
             filteredStudents.forEachIndexed { index, student ->
                 val record = attendanceRecords.find { it.studentId == student.id }
                 val status = record?.status ?: "لم يُسجل"
-                appendLine("${index + 1}. ${student.name} :$status")
+                appendLine("${index + 1}. ${student.name} : $status")
             }
         }
 
@@ -285,8 +280,8 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
                         }
                     }
 
-                    IconButton(onClick = { viewModel.logout() }) {
-                        Icon(imageVector = Icons.Default.ExitToApp, contentDescription = "تسجيل خروج")
+                    TextButton(onClick = { viewModel.logout() }) {
+                        Text("خروج", color = MaterialTheme.colorScheme.error)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -607,4 +602,30 @@ fun StudentRowCard(
                         onClick = { onMarkAttendance(status) },
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                     ) {
-                        Text(status, style = MaterialTheme
+                        Text(status, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text("التقييم السريع:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                val evals = listOf("حفظه", "لم يحفظ", "مميز", "مؤدب", "نسيان الكتب")
+                evals.forEach { eval ->
+                    FilledTonalButton(
+                        onClick = { onMarkEvaluation(eval) },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(eval, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+    }
+}
