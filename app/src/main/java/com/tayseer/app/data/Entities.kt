@@ -38,7 +38,8 @@ data class AttendanceRecord(
     val date: String,
     val status: String, // حاضر، غائب، مستأذن، متأخر، غائب بعذر، هارب
     val excuseReason: String? = null,
-    val excuseType: String? = null
+    val excuseType: String? = null, // ورقة من ولي الأمر، اتصال، رسالة واتساب، رسالة SMS
+    val isResolved: Boolean = false // هل تمت معالجة وتوثيق العذر أم لا تزال بحاجة متابعة
 )
 
 @Entity(
@@ -81,6 +82,14 @@ interface AppDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAttendance(record: AttendanceRecord)
 
+    // استعلام لجلب حالات الغياب والتأخر التي تحتاج متابعة
+    @Query("SELECT * FROM attendance_records WHERE status IN ('غائب', 'متأخر', 'غائب بعذر') AND isResolved = 0 ORDER BY date DESC")
+    fun getPendingAlerts(): Flow<List<AttendanceRecord>>
+
+    // تحديث وتوثيق العذر لإزالته من التنبيهات
+    @Query("UPDATE attendance_records SET excuseType = :excuseType, excuseReason = :excuseReason, isResolved = 1 WHERE id = :recordId")
+    suspend fun resolveAlert(recordId: Long, excuseType: String, excuseReason: String)
+
     @Query("SELECT * FROM evaluation_records WHERE studentId = :studentId ORDER BY id DESC")
     fun getEvaluationsForStudent(studentId: Long): Flow<List<EvaluationRecord>>
 
@@ -90,7 +99,7 @@ interface AppDao {
 
 @Database(
     entities = [Student::class, AttendanceRecord::class, EvaluationRecord::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -106,7 +115,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "tayseer_database"
-                ).build()
+                )
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }
