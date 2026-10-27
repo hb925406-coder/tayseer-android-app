@@ -11,6 +11,8 @@ data class Student(
     val name: String,
     val section: String = "",
     val levelId: Long = 1,
+    val phone: String = "",
+    val parentPhone: String = "",
     val isActive: Boolean = true
 )
 
@@ -24,7 +26,10 @@ data class Student(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index(value = ["studentId", "date"], unique = true)]
+    indices = [
+        Index(value = ["studentId", "date"], unique = true),
+        Index(value = ["studentId"])
+    ]
 )
 data class AttendanceRecord(
     @PrimaryKey(autoGenerate = true)
@@ -45,6 +50,9 @@ data class AttendanceRecord(
             childColumns = ["studentId"],
             onDelete = ForeignKey.CASCADE
         )
+    ],
+    indices = [
+        Index(value = ["studentId"])
     ]
 )
 data class EvaluationRecord(
@@ -63,6 +71,9 @@ interface AppDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertStudent(student: Student): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertStudents(students: List<Student>): List<Long>
 
     @Query("SELECT * FROM attendance_records WHERE date = :date")
     fun getAttendanceByDate(date: String): Flow<List<AttendanceRecord>>
