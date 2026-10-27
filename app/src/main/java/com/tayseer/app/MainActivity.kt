@@ -1,5 +1,6 @@
 package com.tayseer.app
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -114,11 +116,51 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
         }
     }
 
+    // دالة إنشاء نص تقرير اليوم ومشاركته
+    fun shareDailyReport() {
+        val totalCount = filteredStudents.size
+        val presentCount = attendanceRecords.count { it.status == "حاضر" }
+        val absentCount = attendanceRecords.count { it.status == "غائب" }
+        val lateCount = attendanceRecords.count { it.status == "متأخر" }
+        val excusedCount = attendanceRecords.count { it.status == "مستأذن" || it.status == "غائب بعذر" }
+
+        val reportText = buildString {
+            appendLine("📊 *تقرير متابعة الطلاب - تطبيق تيسير*")
+            appendLine("التاريخ: $displayDate")
+            appendLine("الحلقة/القسم: $selectedSection")
+            appendLine("---------------------------")
+            appendLine("إجمالي الطلاب: $totalCount")
+            appendLine("✅ الحضور: $presentCount")
+            appendLine("❌ الغياب: $absentCount")
+            appendLine("⏰ التأخر: $lateCount")
+            appendLine("📝 بعذر/مستأذن: $excusedCount")
+            appendLine("---------------------------")
+            appendLine("كشف الحالات:")
+            filteredStudents.forEachIndexed { index, student ->
+                val record = attendanceRecords.find { it.studentId == student.id }
+                val status = record?.status ?: "لم يُسجل"
+                appendLine("${index + 1}. ${student.name} : $status")
+            }
+        }
+
+        val sendIntent = Intent().apply {
+            action = Intent.ACTION_SEND
+            putExtra(Intent.EXTRA_TEXT, reportText)
+            type = "text/plain"
+        }
+        val shareIntent = Intent.createChooser(sendIntent, "مشاركة تقرير اليوم")
+        context.startActivity(shareIntent)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("تطبيق تيسير") },
                 actions = {
+                    IconButton(onClick = { shareDailyReport() }) {
+                        Icon(imageVector = Icons.Default.Share, contentDescription = "مشاركة التقرير")
+                    }
+
                     IconButton(onClick = { showAlertsDialog = true }) {
                         BadgedBox(
                             badge = {
@@ -162,7 +204,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
-            // شريط التاريخ والتحضير الجماعي
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -202,7 +243,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // حقل البحث السريع بالاسم
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -221,7 +261,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // شريط تصفية الحلقات / الأقسام
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -239,7 +278,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // قائمة الطلاب
             if (filteredStudents.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -273,7 +311,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
             }
         }
 
-        // نافذة التنبيهات ومتابعة الأعذار
         if (showAlertsDialog) {
             AlertDialog(
                 onDismissRequest = { showAlertsDialog = false },
@@ -308,7 +345,6 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
             )
         }
 
-        // نافذة إضافة طالب يدوي
         if (showAddStudentDialog) {
             AlertDialog(
                 onDismissRequest = { showAddStudentDialog = false },
