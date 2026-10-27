@@ -6,6 +6,7 @@ import com.tayseer.app.data.AppDao
 import com.tayseer.app.data.AttendanceRecord
 import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Student
+import com.tayseer.app.data.User
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -43,18 +44,52 @@ class MainViewModel(private val dao: AppDao) : ViewModel() {
     private val _selectedSection = MutableStateFlow("الكل")
     val selectedSection: StateFlow<String> = _selectedSection.asStateFlow()
 
+    // نظام تسجيل الدخول والمستخدم الحالي
+    private val _currentUser = MutableStateFlow<User?>(null)
+    val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
+
+    private val _loginError = MutableStateFlow<String?>(null)
+    val loginError: StateFlow<String?> = _loginError.asStateFlow()
+
     val students: StateFlow<List<Student>> = dao.getAllActiveStudents()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _attendanceRecords = MutableStateFlow<List<AttendanceRecord>>(emptyList())
     val attendanceRecords: StateFlow<List<AttendanceRecord>> = _attendanceRecords.asStateFlow()
 
-    // قائمة التنبيهات للحالات غير الموثقة
     val pendingAlerts: StateFlow<List<AttendanceRecord>> = dao.getPendingAlerts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         loadAttendanceForDate(todayDateString)
+        initializeDefaultUsers()
+    }
+
+    // إنشاء حساب مدير تجريبي تلقائياً إذا كانت قاعدة البيانات جديدة
+    private fun initializeDefaultUsers() {
+        viewModelScope.launch {
+            if (dao.getUsersCount() == 0) {
+                dao.insertUser(User(username = "admin", passwordHash = "123456", role = "ADMIN"))
+                dao.insertUser(User(username = "teacher", passwordHash = "123456", role = "TEACHER"))
+            }
+        }
+    }
+
+    fun login(username: String, password: String) {
+        viewModelScope.launch {
+            val user = dao.login(username.trim(), password.trim())
+            if (user != null) {
+                _currentUser.value = user
+                _loginError.value = null
+            } else {
+                _loginError.value = "اسم المستخدم أو كلمة المرور غير صحيحة"
+            }
+        }
+    }
+
+    fun logout() {
+        _currentUser.value = null
+        _loginError.value = null
     }
 
     fun toggleCalendarType() {
@@ -107,7 +142,6 @@ class MainViewModel(private val dao: AppDao) : ViewModel() {
         }
     }
 
-    // توثيق العذر وإزالته من شاشة التنبيهات
     fun resolveAlert(recordId: Long, excuseType: String, excuseReason: String) {
         viewModelScope.launch {
             dao.resolveAlert(recordId, excuseType, excuseReason)
