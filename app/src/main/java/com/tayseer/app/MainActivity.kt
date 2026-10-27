@@ -15,8 +15,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -72,6 +74,7 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
     val isHijri by viewModel.isHijri.collectAsState()
     val selectedSection by viewModel.selectedSection.collectAsState()
 
+    var searchQuery by remember { mutableStateOf("") }
     var showAddStudentDialog by remember { mutableStateOf(false) }
     var showAlertsDialog by remember { mutableStateOf(false) }
 
@@ -103,8 +106,12 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
         listOf("الكل") + students.map { it.section }.filter { it.isNotBlank() }.distinct()
     }
 
-    val filteredStudents = remember(students, selectedSection) {
-        if (selectedSection == "الكل") students else students.filter { it.section == selectedSection }
+    val filteredStudents = remember(students, selectedSection, searchQuery) {
+        students.filter { student ->
+            val matchSection = (selectedSection == "الكل" || student.section == selectedSection)
+            val matchSearch = searchQuery.isBlank() || student.name.contains(searchQuery.trim(), ignoreCase = true)
+            matchSection && matchSearch
+        }
     }
 
     Scaffold(
@@ -155,6 +162,7 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
+            // شريط التاريخ والتحضير الجماعي
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -194,6 +202,26 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // حقل البحث السريع بالاسم
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("بحث عن طالب بالاسم...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "بحث") },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Clear, contentDescription = "مسح")
+                        }
+                    }
+                },
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // شريط تصفية الحلقات / الأقسام
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -211,12 +239,16 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // قائمة الطلاب
             if (filteredStudents.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("لا يوجد طلاب. اضغط 'استيراد Excel' أو زر + للإضافة.")
+                    Text(
+                        if (searchQuery.isNotBlank()) "لا توجد نتائج تطابق: $searchQuery"
+                        else "لا يوجد طلاب. اضغط 'استيراد Excel' أو زر + للإضافة."
+                    )
                 }
             } else {
                 LazyColumn(
