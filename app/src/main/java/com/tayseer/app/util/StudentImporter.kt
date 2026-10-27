@@ -7,35 +7,32 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 
 object StudentImporter {
-
-    fun parseCsvOrTxt(context: Context, uri: Uri, levelId: Long): List<Student> {
-        val students = mutableListOf<Student>()
+    fun importStudents(context: Context, uri: Uri): List<Student> {
+        val studentsList = mutableListOf<Student>()
         context.contentResolver.openInputStream(uri)?.use { inputStream ->
-            BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8)).use { reader ->
-                var line = reader.readLine()
-                while (line != null) {
-                    val trimmed = line.trim()
-                    if (trimmed.isNotBlank()) {
-                        val parts = trimmed.split(",", "\t", ";")
-                        val name = parts.getOrNull(0)?.trim() ?: ""
-                        val phone = parts.getOrNull(1)?.trim() ?: ""
-                        val parentPhone = parts.getOrNull(2)?.trim() ?: phone
-                        
-                        if (name.isNotBlank() && !name.contains("الاسم") && !name.contains("name", ignoreCase = true)) {
-                            students.add(
+            BufferedReader(InputStreamReader(inputStream)).use { reader ->
+                var line = reader.readLine() // قراءة السطر الأول (الترويسة)
+                while (reader.readLine().also { line = it } != null) {
+                    val tokens = line?.split(",") ?: continue
+                    if (tokens.isNotEmpty()) {
+                        val name = tokens.getOrNull(0)?.trim().orEmpty()
+                        if (name.isNotBlank()) {
+                            val section = tokens.getOrNull(1)?.trim().orEmpty()
+                            val phone = tokens.getOrNull(2)?.trim().orEmpty()
+                            val parentPhone = tokens.getOrNull(3)?.trim().orEmpty()
+                            studentsList.add(
                                 Student(
-                                    levelId = levelId,
                                     name = name,
+                                    section = section,
                                     phone = phone,
                                     parentPhone = parentPhone
                                 )
                             )
                         }
                     }
-                    line = reader.readLine()
                 }
             }
         }
-        return students
+        return studentsList
     }
 }
