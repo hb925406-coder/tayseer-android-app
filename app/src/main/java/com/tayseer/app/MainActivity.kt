@@ -65,7 +65,8 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
 
     val students by viewModel.students.collectAsState()
     val attendanceRecords by viewModel.attendanceRecords.collectAsState()
-    val currentDate by viewModel.selectedDate.collectAsState()
+    val displayDate by viewModel.displayDate.collectAsState()
+    val isHijri by viewModel.isHijri.collectAsState()
     val selectedSection by viewModel.selectedSection.collectAsState()
 
     var showAddStudentDialog by remember { mutableStateOf(false) }
@@ -73,7 +74,7 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
     var newStudentSection by remember { mutableStateOf("") }
     var newStudentPhone by remember { mutableStateOf("") }
 
-    // مستورد ملفات الإكسل والـ CSV
+    // مستورد ملفات الطلاب
     val excelPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -94,7 +95,7 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
         }
     }
 
-    // استخراج الحلقات/الأقسام المتوفرة
+    // استخراج الحلقات/الأقسام
     val sections = remember(students) {
         listOf("الكل") + students.map { it.section }.filter { it.isNotBlank() }.distinct()
     }
@@ -139,19 +140,29 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
-            // شريط التاريخ والتحضير الجماعي
+            // شريط التاريخ الهجري/الميلادي وزر التبديل والتحضير الجماعي
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
                     Icon(imageVector = Icons.Default.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "التاريخ: $currentDate",
+                        text = displayDate,
                         style = MaterialTheme.typography.titleMedium
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(
+                        onClick = { viewModel.toggleCalendarType() },
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(if (isHijri) "تحويل للميلادي" else "تحويل للهجري", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
 
                 Button(
@@ -159,11 +170,11 @@ fun TayseerMainScreen(viewModel: MainViewModel) {
                         viewModel.markAllPresent(filteredStudents)
                         Toast.makeText(context, "تم تحضير جميع طلاب القائمة كـ حاضر", Toast.LENGTH_SHORT).show()
                     },
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                 ) {
                     Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("تحضير الكل حاضر", style = MaterialTheme.typography.labelMedium)
+                    Text("الكل حاضر", style = MaterialTheme.typography.labelMedium)
                 }
             }
 
