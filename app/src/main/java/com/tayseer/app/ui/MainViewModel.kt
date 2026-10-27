@@ -1,5 +1,6 @@
 package com.tayseer.app.ui
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tayseer.app.data.AppDao
@@ -7,69 +8,50 @@ import com.tayseer.app.data.AttendanceRecord
 import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Student
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.LocalDate
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainViewModel(private val dao: AppDao) : ViewModel() {
 
-    private val _students = MutableStateFlow<List<Student>>(emptyList())
-    val students: StateFlow<List<Student>> = _students.asStateFlow()
+    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    val todayDateString: String = dateFormat.format(Date())
+
+    private val _selectedDate = MutableStateFlow(todayDateString)
+    val selectedDate: StateFlow<String> = _selectedDate.asStateFlow()
+
+    private val _selectedSection = MutableStateFlow("الكل")
+    val selectedSection: StateFlow<String> = _selectedSection.asStateFlow()
+
+    val students: StateFlow<List<Student>> = dao.getAllActiveStudents()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _attendanceRecords = MutableStateFlow<List<AttendanceRecord>>(emptyList())
     val attendanceRecords: StateFlow<List<AttendanceRecord>> = _attendanceRecords.asStateFlow()
 
-    private val _evaluationRecords = MutableStateFlow<List<EvaluationRecord>>(emptyList())
-    val evaluationRecords: StateFlow<List<EvaluationRecord>> = _evaluationRecords.asStateFlow()
-
-    private val _selectedDate = MutableStateFlow(LocalDate.now().toString())
-    val selectedDate: StateFlow<String> = _selectedDate.asStateFlow()
-
     init {
-        loadStudents()
-        loadAttendanceForDate(_selectedDate.value)
+        loadAttendanceForDate(todayDateString)
     }
 
-    fun setSelectedDate(date: String) {
+    fun setDate(date: String) {
         _selectedDate.value = date
         loadAttendanceForDate(date)
     }
 
-    private fun loadStudents() {
-        viewModelScope.launch {
-            dao.getAllActiveStudents()
-                .catch { _students.value = emptyList() }
-                .collect { list ->
-                    _students.value = list
-                }
-        }
+    fun setSection(section: String) {
+        _selectedSection.value = section
     }
 
-    fun loadAttendanceForDate(date: String) {
+    private fun loadAttendanceForDate(date: String) {
         viewModelScope.launch {
-            dao.getAttendanceByDate(date)
-                .catch { _attendanceRecords.value = emptyList() }
-                .collect { records ->
-                    _attendanceRecords.value = records
-                }
-        }
-    }
-
-    fun loadEvaluationsForStudent(studentId: Long) {
-        viewModelScope.launch {
-            dao.getEvaluationsForStudent(studentId)
-                .catch { _evaluationRecords.value = emptyList() }
-                .collect { records ->
-                    _evaluationRecords.value = records
-                }
-        }
-    }
-
-    fun insertStudent(student: Student) {
-        viewModelScope.launch {
-            dao.insertStudent(student)
+            dao.getAttendanceByDate(date).collect { list ->
+                _attendanceRecords.value = list
+            }
         }
     }
 
@@ -86,15 +68,40 @@ class MainViewModel(private val dao: AppDao) : ViewModel() {
         }
     }
 
-    fun markEvaluation(studentId: Long, type: String, noteText: String? = null) {
+    fun markAllPresent(studentList: List<Student>) {
+        viewModelScope.launch {
+            studentList.forEach { student ->
+                val record = AttendanceRecord(
+                    studentId = student.id,
+                    date = _selectedDate.value,
+                    status = "حاضر"
+                )
+                dao.insertAttendance(record)
+            }
+        }
+    }
+
+    fun markEvaluation(studentId: Long, evaluationType: String, notes: String? = null) {
         viewModelScope.launch {
             val record = EvaluationRecord(
                 studentId = studentId,
                 date = _selectedDate.value,
-                evaluationType = type,
-                notes = noteText
+                evaluationType = evaluationType,
+                notes = notes
             )
             dao.insertEvaluation(record)
+        }
+    }
+
+    fun insertStudent(student: Student) {
+        viewModelScope.launch {
+            dao.insertStudent(student)
+        }
+    }
+
+    fun insertStudentsList(studentsList: List<Student>) {
+        viewModelScope.launch {
+            dao.insertStudents(studentsList)
         }
     }
 }
