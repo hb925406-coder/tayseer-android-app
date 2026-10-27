@@ -1,6 +1,5 @@
 package com.tayseer.app.ui
 
-import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tayseer.app.data.AppDao
@@ -14,16 +13,33 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.time.chrono.HijrahDate
+import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
 
 class MainViewModel(private val dao: AppDao) : ViewModel() {
 
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-    val todayDateString: String = dateFormat.format(Date())
+    private val gregorianFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
+    val todayDateString: String = gregorianFormat.format(Date())
+
+    // التاريخ الهجري الحالي
+    val todayHijriString: String = try {
+        val hijrahDate = HijrahDate.now()
+        val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd", Locale("ar"))
+        formatter.format(hijrahDate) + " هـ"
+    } catch (e: Exception) {
+        "1448 هـ"
+    }
 
     private val _selectedDate = MutableStateFlow(todayDateString)
     val selectedDate: StateFlow<String> = _selectedDate.asStateFlow()
+
+    private val _displayDate = MutableStateFlow(todayHijriString)
+    val displayDate: StateFlow<String> = _displayDate.asStateFlow()
+
+    private val _isHijri = MutableStateFlow(true)
+    val isHijri: StateFlow<Boolean> = _isHijri.asStateFlow()
 
     private val _selectedSection = MutableStateFlow("الكل")
     val selectedSection: StateFlow<String> = _selectedSection.asStateFlow()
@@ -36,6 +52,11 @@ class MainViewModel(private val dao: AppDao) : ViewModel() {
 
     init {
         loadAttendanceForDate(todayDateString)
+    }
+
+    fun toggleCalendarType() {
+        _isHijri.value = !_isHijri.value
+        _displayDate.value = if (_isHijri.value) todayHijriString else todayDateString
     }
 
     fun setDate(date: String) {
