@@ -44,12 +44,21 @@ class MainViewModel(private val dao: AppDao) : ViewModel() {
     private val _selectedSection = MutableStateFlow("الكل")
     val selectedSection: StateFlow<String> = _selectedSection.asStateFlow()
 
-    // نظام تسجيل الدخول والمستخدم الحالي
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
 
     private val _loginError = MutableStateFlow<String?>(null)
     val loginError: StateFlow<String?> = _loginError.asStateFlow()
+
+    // بيانات خاصة بولي الأمر (طالبه المحدد وسجلاته)
+    private val _parentStudent = MutableStateFlow<Student?>(null)
+    val parentStudent: StateFlow<Student?> = _parentStudent.asStateFlow()
+
+    private val _parentAttendance = MutableStateFlow<List<AttendanceRecord>>(emptyList())
+    val parentAttendance: StateFlow<List<AttendanceRecord>> = _parentAttendance.asStateFlow()
+
+    private val _parentEvaluations = MutableStateFlow<List<EvaluationRecord>>(emptyList())
+    val parentEvaluations: StateFlow<List<EvaluationRecord>> = _parentEvaluations.asStateFlow()
 
     val students: StateFlow<List<Student>> = dao.getAllActiveStudents()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -65,12 +74,13 @@ class MainViewModel(private val dao: AppDao) : ViewModel() {
         initializeDefaultUsers()
     }
 
-    // إنشاء حساب مدير تجريبي تلقائياً إذا كانت قاعدة البيانات جديدة
     private fun initializeDefaultUsers() {
         viewModelScope.launch {
             if (dao.getUsersCount() == 0) {
                 dao.insertUser(User(username = "admin", passwordHash = "123456", role = "ADMIN"))
                 dao.insertUser(User(username = "teacher", passwordHash = "123456", role = "TEACHER"))
+                // حساب افتراضي لولي أمر مرتبط بأول طالب افتراضياً (linkedId = 1)
+                dao.insertUser(User(username = "parent", passwordHash = "123456", role = "PARENT", linkedId = 1L))
             }
         }
     }
@@ -81,8 +91,25 @@ class MainViewModel(private val dao: AppDao) : ViewModel() {
             if (user != null) {
                 _currentUser.value = user
                 _loginError.value = null
+                if (user.role == "PARENT" && user.linkedId != null) {
+                    loadParentData(user.linkedId)
+                }
             } else {
                 _loginError.value = "اسم المستخدم أو كلمة المرور غير صحيحة"
+            }
+        }
+    }
+
+    private fun loadParentData(studentId: Long) {
+        viewModelScope.launch {
+            _parentStudent.value = dao.getStudentById(studentId)
+            dao.getAttendanceForStudent(studentId).collect {
+                _parentAttendance.value = it
+            }
+        }
+        viewModelScope.launch {
+            dao.getEvaluationsForStudent(studentId).collect {
+                _parentEvaluations.value = it
             }
         }
     }
@@ -90,6 +117,7 @@ class MainViewModel(private val dao: AppDao) : ViewModel() {
     fun logout() {
         _currentUser.value = null
         _loginError.value = null
+        _parentStudent.value = null
     }
 
     fun toggleCalendarType() {
