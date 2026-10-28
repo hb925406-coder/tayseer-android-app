@@ -36,7 +36,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tayseer.app.data.AppDatabase
 import com.tayseer.app.data.AttendanceRecord
-import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Student
 import com.tayseer.app.data.User
 import com.tayseer.app.ui.MainViewModel
@@ -397,7 +396,7 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
             filteredStudents.forEachIndexed { index, student ->
                 val record = attendanceRecords.find { it.studentId == student.id }
                 val status = record?.status ?: "لم يُسجل"
-                appendLine("${index + 1}. ${student.name} :$status")
+                appendLine("${index + 1}. ${student.name} : $status")
             }
         }
 
@@ -843,4 +842,57 @@ fun StudentRowCard(
                     SuggestionChip(
                         onClick = { },
                         label = { Text(currentStatus) },
-                        colors = Suggest
+                        colors = SuggestionChipDefaults.suggestionChipColors(
+                            containerColor = when (currentStatus) {
+                                "حاضر" -> MaterialTheme.colorScheme.primaryContainer
+                                "غائب", "هارب" -> MaterialTheme.colorScheme.errorContainer
+                                "متأخر", "مستأذن", "غائب بعذر" -> MaterialTheme.colorScheme.tertiaryContainer
+                                else -> MaterialTheme.colorScheme.surfaceVariant
+                            }
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text("تسجيل الحضور:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                val statuses = listOf("حاضر", "غائب", "مستأذن", "متأخر", "غائب بعذر", "هارب")
+                statuses.forEach { status ->
+                    OutlinedButton(
+                        onClick = { onMarkAttendance(status) },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(status, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text("التقييم السريع:", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                val evals = listOf("حفظه", "لم يحفظ", "مميز", "مؤدب", "نسيان الكتب")
+                evals.forEach { eval ->
+                    FilledTonalButton(
+                        onClick = { onMarkEvaluation(eval) },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(eval, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+    }
+}
