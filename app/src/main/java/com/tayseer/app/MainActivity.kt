@@ -414,3 +414,433 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
         scope.launch {
             try {
                 val pdfFile = withContext(Dispatchers.IO) {
+                    PdfReportGenerator.generateDailyReportPdf(
+                        context = context,
+                        students = filteredStudents,
+                        records = attendanceRecords,
+                        dateString = displayDate,
+                        section = selectedSection
+                    )
+                }
+                val fileUri = FileProvider.getUriForFile(
+                    context,
+                    "com.tayseer.app.fileprovider",
+                    pdfFile
+                )
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    putExtra(Intent.EXTRA_STREAM, fileUri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(shareIntent, "مشاركة تقرير PDF"))
+            } catch (e: Exception) {
+                Toast.makeText(context, "خطأ في إنشاء PDF: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    fun shareStudentSummaryPdf(student: Student) {
+        scope.launch {
+            try {
+                val database = AppDatabase.getDatabase(context)
+                val attList = withContext(Dispatchers.IO) {
+                    database.appDao().getAttendanceListForStudent(student.id)
+                }
+                val evalList = withContext(Dispatchers.IO) {
+                    database.appDao().getEvaluationListForStudent(student.id)
+                }
+
+                val pdfFile = withContext(Dispatchers.IO) {
+                    PdfReportGenerator.generateStudentSummaryPdf(
+                        context = context,
+                        student = student,
+                        attendanceList = attList,
+                        evaluationList = evalList
+                    )
+                }
+                val fileUri = FileProvider.getUriForFile(
+                    context,
+                    "com.tayseer.app.fileprovider",
+                    pdfFile
+                )
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    putExtra(Intent.EXTRA_STREAM, fileUri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(shareIntent, "مشاركة خلاصة الطالب"))
+            } catch (e: Exception) {
+                Toast.makeText(context, "خطأ في إنشاء خلاصة الطالب: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("تطبيق تيسير")
+                        Text(
+                            text = "المستخدم: ${user.username} (${if (user.role == "ADMIN") "إدارة" else "معلم"})",
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                },
+                actions = {
+                    TextButton(onClick = { shareDailyReportPdf() }) {
+                        Text("PDF", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    }
+
+                    IconButton(onClick = { shareDailyReportText() }) {
+                        Icon(imageVector = Icons.Default.Share, contentDescription = "مشاركة نص")
+                    }
+
+                    IconButton(onClick = { showAlertsDialog = true }) {
+                        BadgedBox(
+                            badge = {
+                                if (pendingAlerts.isNotEmpty()) {
+                                    Badge { Text("${pendingAlerts.size}") }
+                                }
+                            }
+                        ) {
+                            Icon(imageVector = Icons.Default.Notifications, contentDescription = "التنبيهات")
+                        }
+                    }
+
+                    if (user.role == "ADMIN") {
+                        TextButton(onClick = {
+                            excelPickerLauncher.launch(
+                                arrayOf(
+                                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    "application/vnd.ms-excel",
+                                    "text/comma-separated-values",
+                                    "text/csv"
+                                )
+                            )
+                        }) {
+                            Text("استيراد Excel", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+
+                        TextButton(onClick = {
+                            backupLauncher.launch("tayseer_backup_${viewModel.todayDateString}.db")
+                        }) {
+                            Text("نسخ احتياطي", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+
+                        TextButton(onClick = {
+                            restoreLauncher.launch(arrayOf("*/*"))
+                        }) {
+                            Text("استعادة", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                    }
+
+                    TextButton(onClick = { viewModel.logout() }) {
+                        Text("خروج", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
+        },
+        floatingActionButton = {
+            if (user.role == "ADMIN") {
+                FloatingActionButton(onClick = { showAddStudentDialog = true }) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = "إضافة طالب")
+                }
+            }
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(imageVector = Icons.Default.DateRange, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = displayDate,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(
+                        onClick = { viewModel.toggleCalendarType() },
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(if (isHijri) "تحويل للميلادي" else "تحويل للهجري", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        viewModel.markAllPresent(filteredStudents)
+                        Toast.makeText(context, "تم تحضير جميع طلاب القائمة كـ حاضر", Toast.LENGTH_SHORT).show()
+                    },
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("الكل حاضر", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("بحث عن طالب بالاسم...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "بحث") },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Clear, contentDescription = "مسح")
+                        }
+                    }
+                },
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                sections.forEach { sec ->
+                    FilterChip(
+                        selected = (sec == selectedSection),
+                        onClick = { viewModel.setSection(sec) },
+                        label = { Text(sec) }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            if (filteredStudents.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        if (searchQuery.isNotBlank()) "لا توجد نتائج تطابق: $searchQuery"
+                        else "لا يوجد طلاب. اضغط 'استيراد Excel' أو زر + للإضافة."
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(filteredStudents, key = { it.id }) { student ->
+                        val attendance = attendanceRecords.find { it.studentId == student.id }
+                        StudentRowCard(
+                            student = student,
+                            currentStatus = attendance?.status ?: "لم يُسجل",
+                            onMarkAttendance = { status ->
+                                viewModel.markAttendance(student.id, status)
+                            },
+                            onMarkEvaluation = { evalType ->
+                                viewModel.markEvaluation(student.id, evalType)
+                                Toast.makeText(context, "تم تسجيل: $evalType لـ ${student.name}", Toast.LENGTH_SHORT).show()
+                            },
+                            onGenerateSummaryPdf = {
+                                shareStudentSummaryPdf(student)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        if (showAlertsDialog) {
+            AlertDialog(
+                onDismissRequest = { showAlertsDialog = false },
+                title = { Text("تنبيهات الغياب والتأخر (${pendingAlerts.size})") },
+                text = {
+                    if (pendingAlerts.isEmpty()) {
+                        Text("ممتاز! لا توجد حالات غياب أو تأخر تحتاج لمتابعة.")
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 350.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(pendingAlerts, key = { it.id }) { alertRecord ->
+                                val student = students.find { it.id == alertRecord.studentId }
+                                AlertItemCard(
+                                    studentName = student?.name ?: "طالب",
+                                    record = alertRecord,
+                                    onResolve = { excuseType, reason ->
+                                        viewModel.resolveAlert(alertRecord.id, excuseType, reason)
+                                        Toast.makeText(context, "تم توثيق العذر بنجاح", Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showAlertsDialog = false }) {
+                        Text("إغلاق")
+                    }
+                }
+            )
+        }
+
+        if (showAddStudentDialog) {
+            AlertDialog(
+                onDismissRequest = { showAddStudentDialog = false },
+                title = { Text("إضافة طالب جديد") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = newStudentName,
+                            onValueChange = { newStudentName = it },
+                            label = { Text("اسم الطالب رباعي") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = newStudentSection,
+                            onValueChange = { newStudentSection = it },
+                            label = { Text("الحلقة / الصف") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = newStudentPhone,
+                            onValueChange = { newStudentPhone = it },
+                            label = { Text("رقم ولي الأمر") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (newStudentName.isNotBlank()) {
+                                viewModel.insertStudent(
+                                    Student(
+                                        name = newStudentName.trim(),
+                                        section = newStudentSection.trim(),
+                                        parentPhone = newStudentPhone.trim()
+                                    )
+                                )
+                                newStudentName = ""
+                                newStudentSection = ""
+                                newStudentPhone = ""
+                                showAddStudentDialog = false
+                            }
+                        }
+                    ) {
+                        Text("حفظ")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAddStudentDialog = false }) {
+                        Text("إلغاء")
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun AlertItemCard(
+    studentName: String,
+    record: AttendanceRecord,
+    onResolve: (String, String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(studentName, style = MaterialTheme.typography.titleSmall)
+                Text("${record.status} (${record.date})", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text("توثيق المتابعة بواسطة:", style = MaterialTheme.typography.labelSmall)
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                val excuseTypes = listOf("ورقة من ولي الأمر", "اتصال", "رسالة واتساب", "رسالة SMS")
+                excuseTypes.forEach { type ->
+                    OutlinedButton(
+                        onClick = { onResolve(type, "تم التوثيق عبر $type") },
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(type, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StudentRowCard(
+    student: Student,
+    currentStatus: String,
+    onMarkAttendance: (String) -> Unit,
+    onMarkEvaluation: (String) -> Unit,
+    onGenerateSummaryPdf: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(text = student.name, style = MaterialTheme.typography.titleMedium)
+                    if (student.section.isNotBlank()) {
+                        Text(
+                            text = "الحلقة: ${student.section}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(
+                        onClick = onGenerateSummaryPdf,
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text("خلاصة PDF", style = MaterialTheme.typography.labelSmall)
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    SuggestionChip(
+                        onClick = { },
+                        label = { Text(currentStatus) },
+                        colors = Suggest
