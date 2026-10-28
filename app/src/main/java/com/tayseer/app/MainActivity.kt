@@ -40,7 +40,12 @@ import com.tayseer.app.data.Student
 import com.tayseer.app.data.User
 import com.tayseer.app.ui.MainViewModel
 import com.tayseer.app.util.StudentImporter
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -293,6 +298,7 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
     var newStudentSection by remember { mutableStateOf("") }
     var newStudentPhone by remember { mutableStateOf("") }
 
+    // استيراد إكسل
     val excelPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -308,6 +314,52 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
                     }
                 } catch (e: Exception) {
                     Toast.makeText(context, "خطأ أثناء قراءة الملف: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    // تصدير النسخة الاحتياطية
+    val backupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                try {
+                    withContext(Dispatchers.IO) {
+                        val dbFile = context.getDatabasePath("tayseer_database")
+                        context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                            FileInputStream(dbFile).use { inputStream ->
+                                inputStream.copyTo(outputStream)
+                            }
+                        }
+                    }
+                    Toast.makeText(context, "تم تصدير النسخة الاحتياطية بنجاح", Toast.LENGTH_LONG).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "فشل إنشاء النسخة الاحتياطية: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    // استعادة النسخة الاحتياطية
+    val restoreLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                try {
+                    withContext(Dispatchers.IO) {
+                        val dbFile = context.getDatabasePath("tayseer_database")
+                        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                            FileOutputStream(dbFile).use { outputStream ->
+                                inputStream.copyTo(outputStream)
+                            }
+                        }
+                    }
+                    Toast.makeText(context, "تم استعادة البيانات بنجاح! أعد تشغيل التطبيق للتحديث.", Toast.LENGTH_LONG).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "فشل استعادة البيانات: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -401,6 +453,18 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
                             )
                         }) {
                             Text("استيراد Excel", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+
+                        TextButton(onClick = {
+                            backupLauncher.launch("tayseer_backup_${viewModel.todayDateString}.db")
+                        }) {
+                            Text("نسخ احتياطي", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+
+                        TextButton(onClick = {
+                            restoreLauncher.launch(arrayOf("*/*"))
+                        }) {
+                            Text("استعادة", color = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                     }
 
