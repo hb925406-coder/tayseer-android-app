@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -39,11 +40,11 @@ import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Student
 import com.tayseer.app.data.User
 import com.tayseer.app.ui.MainViewModel
+import com.tayseer.app.util.PdfReportGenerator
 import com.tayseer.app.util.StudentImporter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 
@@ -298,7 +299,6 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
     var newStudentSection by remember { mutableStateOf("") }
     var newStudentPhone by remember { mutableStateOf("") }
 
-    // استيراد إكسل
     val excelPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -319,7 +319,6 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
         }
     }
 
-    // تصدير النسخة الاحتياطية
     val backupLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri: Uri? ->
@@ -342,7 +341,6 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
         }
     }
 
-    // استعادة النسخة الاحتياطية
     val restoreLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -377,7 +375,7 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
         }
     }
 
-    fun shareDailyReport() {
+    fun shareDailyReportText() {
         val totalCount = filteredStudents.size
         val presentCount = attendanceRecords.count { it.status == "حاضر" }
         val absentCount = attendanceRecords.count { it.status == "غائب" }
@@ -408,8 +406,37 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
             putExtra(Intent.EXTRA_TEXT, reportText)
             type = "text/plain"
         }
-        val shareIntent = Intent.createChooser(sendIntent, "مشاركة تقرير اليوم")
+        val shareIntent = Intent.createChooser(sendIntent, "مشاركة تقرير نصي")
         context.startActivity(shareIntent)
+    }
+
+    fun shareDailyReportPdf() {
+        scope.launch {
+            try {
+                val pdfFile = withContext(Dispatchers.IO) {
+                    PdfReportGenerator.generateDailyReportPdf(
+                        context = context,
+                        students = filteredStudents,
+                        records = attendanceRecords,
+                        dateString = displayDate,
+                        section = selectedSection
+                    )
+                }
+                val fileUri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    pdfFile
+                )
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    putExtra(Intent.EXTRA_STREAM, fileUri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(shareIntent, "مشاركة تقرير PDF"))
+            } catch (e: Exception) {
+                Toast.makeText(context, "خطأ في إنشاء PDF: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     Scaffold(
@@ -425,8 +452,12 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
                     }
                 },
                 actions = {
-                    IconButton(onClick = { shareDailyReport() }) {
-                        Icon(imageVector = Icons.Default.Share, contentDescription = "مشاركة التقرير")
+                    TextButton(onClick = { shareDailyReportPdf() }) {
+                        Text("PDF", color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    }
+
+                    IconButton(onClick = { shareDailyReportText() }) {
+                        Icon(imageVector = Icons.Default.Share, contentDescription = "مشاركة نص")
                     }
 
                     IconButton(onClick = { showAlertsDialog = true }) {
