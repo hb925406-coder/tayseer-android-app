@@ -11,11 +11,10 @@ import kotlinx.coroutines.launch
 
 @Database(
     entities = [
-        User::class,
-        StudentGroup::class,
         Student::class,
         AttendanceRecord::class,
-        EvaluationRecord::class
+        EvaluationRecord::class,
+        User::class
     ],
     version = 1,
     exportSchema = false
@@ -28,52 +27,48 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        fun getDatabase(context: Context, scope: CoroutineScope): AppDatabase {
+        fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "tayseer_database"
                 )
-                    .addCallback(DatabaseCallback(scope))
+                    .addCallback(object : RoomDatabase.Callback() {
+                        override fun onCreate(db: SupportSQLiteDatabase) {
+                            super.onCreate(db)
+                            // إضافة الحسابات الافتراضية تلقائياً عند أول إنشاء لقاعدة البيانات
+                            INSTANCE?.let { database ->
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    val dao = database.appDao()
+                                    if (dao.getUsersCount() == 0) {
+                                        dao.insertUser(User(username = "admin", passwordHash = "123456", role = "ADMIN"))
+                                        dao.insertUser(User(username = "teacher", passwordHash = "123456", role = "TEACHER"))
+                                        dao.insertUser(User(username = "parent", passwordHash = "123456", role = "PARENT"))
+                                    }
+                                }
+                            }
+                        }
+
+                        override fun onOpen(db: SupportSQLiteDatabase) {
+                            super.onOpen(db)
+                            // التأكد الدائم من وجود الحسابات حتى عند التحديثات
+                            INSTANCE?.let { database ->
+                                CoroutineScope(Dispatchers.IO).launch {
+                                    val dao = database.appDao()
+                                    if (dao.getUsersCount() == 0) {
+                                        dao.insertUser(User(username = "admin", passwordHash = "123456", role = "ADMIN"))
+                                        dao.insertUser(User(username = "teacher", passwordHash = "123456", role = "TEACHER"))
+                                        dao.insertUser(User(username = "parent", passwordHash = "123456", role = "PARENT"))
+                                    }
+                                }
+                            }
+                        }
+                    })
+                    .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance
-            }
-        }
-
-        private class DatabaseCallback(
-            private val scope: CoroutineScope
-        ) : RoomDatabase.Callback() {
-            override fun onCreate(db: SupportSQLiteDatabase) {
-                super.onCreate(db)
-                INSTANCE?.let { database ->
-                    scope.launch(Dispatchers.IO) {
-                        val dao = database.appDao()
-                        // إنشاء حساب الإدارة الافتراضي تلقائياً عند تشغيل التطبيق لأول مرة
-                        if (dao.getUsersCount() == 0) {
-                            dao.insertUser(
-                                User(
-                                    username = "admin",
-                                    passwordHash = "admin123",
-                                    role = "ADMIN"
-                                )
-                            )
-                            // إضافة حلقة/قسم افتراضي كبداية
-                            val defaultGroupId = dao.insertGroup(
-                                StudentGroup(name = "الحلقة العامة")
-                            )
-                            // إضافة نموذج طالب للبدء
-                            dao.insertStudent(
-                                Student(
-                                    name = "طالب تجريبي",
-                                    groupId = defaultGroupId,
-                                    parentPhone = "0500000000"
-                                )
-                            )
-                        }
-                    }
-                }
             }
         }
     }
