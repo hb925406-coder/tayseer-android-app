@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tayseer.app.data.AppDao
 import com.tayseer.app.data.AttendanceRecord
+import com.tayseer.app.data.CustomEvaluation
 import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Student
 import com.tayseer.app.data.User
@@ -39,6 +40,9 @@ class MainViewModel(private val appDao: AppDao) : ViewModel() {
     }
 
     val students: StateFlow<List<Student>> = appDao.getAllActiveStudents()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val customEvaluations: StateFlow<List<CustomEvaluation>> = appDao.getAllCustomEvaluations()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val pendingAlerts: StateFlow<List<AttendanceRecord>> = appDao.getPendingAlerts()
@@ -125,7 +129,6 @@ class MainViewModel(private val appDao: AppDao) : ViewModel() {
 
     fun deleteStudent(student: Student) {
         viewModelScope.launch {
-            // أرشفة الطالب بتعطيله (isActive = false) حتى يختفي من القائمة دون الحاجة لدوال إضافية
             appDao.insertStudent(student.copy(isActive = false))
         }
     }
@@ -133,6 +136,19 @@ class MainViewModel(private val appDao: AppDao) : ViewModel() {
     fun insertStudentsList(studentsList: List<Student>) {
         viewModelScope.launch {
             appDao.insertStudents(studentsList)
+        }
+    }
+
+    fun addCustomEvaluation(title: String) {
+        if (title.isBlank()) return
+        viewModelScope.launch {
+            appDao.insertCustomEvaluation(CustomEvaluation(title = title.trim()))
+        }
+    }
+
+    fun deleteCustomEvaluation(evaluation: CustomEvaluation) {
+        viewModelScope.launch {
+            appDao.deleteCustomEvaluation(evaluation)
         }
     }
 
