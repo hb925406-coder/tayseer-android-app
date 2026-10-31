@@ -20,6 +20,25 @@ class MainViewModel(private val appDao: AppDao) : ViewModel() {
     private val _loginError = MutableStateFlow<String?>(null)
     val loginError: StateFlow<String?> = _loginError.asStateFlow()
 
+    init {
+        // التأكد الفوري عند تشغيل التطبيق من وجود الحسابات الأساسية وزرعها إن كانت مفقودة
+        viewModelScope.launch {
+            ensureDefaultUsersExist()
+        }
+    }
+
+    private suspend fun ensureDefaultUsersExist() {
+        try {
+            if (appDao.getUsersCount() == 0) {
+                appDao.insertUser(User(username = "admin", passwordHash = "123456", role = "ADMIN"))
+                appDao.insertUser(User(username = "teacher", passwordHash = "123456", role = "TEACHER"))
+                appDao.insertUser(User(username = "parent", passwordHash = "123456", role = "PARENT"))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     val students: StateFlow<List<Student>> = appDao.getAllActiveStudents()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -46,7 +65,6 @@ class MainViewModel(private val appDao: AppDao) : ViewModel() {
     val attendanceRecords: StateFlow<List<AttendanceRecord>> = appDao.getAttendanceByDate(todayDateString)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // بيانات بوابة ولي الأمر (ترتبط بأول طالب كافتراضي عند دخول الحساب)
     private val _parentStudent = MutableStateFlow<Student?>(null)
     val parentStudent: StateFlow<Student?> = _parentStudent.asStateFlow()
 
@@ -62,7 +80,13 @@ class MainViewModel(private val appDao: AppDao) : ViewModel() {
 
     fun login(username: String, pass: String) {
         viewModelScope.launch {
-            val user = appDao.login(username.trim(), pass.trim())
+            val uName = username.trim()
+            val pWord = pass.trim()
+
+            // التأكد أولاً من وجود المستخدمين قبل المقارنة
+            ensureDefaultUsersExist()
+
+            val user = appDao.login(uName, pWord)
             if (user != null) {
                 _currentUser.value = user
                 _loginError.value = null
