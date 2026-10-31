@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -36,7 +37,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tayseer.app.data.AppDatabase
 import com.tayseer.app.data.AttendanceRecord
-import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Student
 import com.tayseer.app.data.User
 import com.tayseer.app.ui.MainViewModel
@@ -294,6 +294,7 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
 
     var searchQuery by remember { mutableStateOf("") }
     var showAddStudentDialog by remember { mutableStateOf(false) }
+    var editingStudent by remember { mutableStateOf<Student?>(null) }
     var showAlertsDialog by remember { mutableStateOf(false) }
 
     var newStudentName by remember { mutableStateOf("") }
@@ -653,6 +654,7 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
                         val attendance = attendanceRecords.find { it.studentId == student.id }
                         StudentRowCard(
                             student = student,
+                            isAdmin = (user.role == "ADMIN"),
                             currentStatus = attendance?.status ?: "لم يُسجل",
                             onMarkAttendance = { status ->
                                 viewModel.markAttendance(student.id, status)
@@ -663,11 +665,75 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
                             },
                             onGenerateSummaryPdf = {
                                 shareStudentSummaryPdf(student)
+                            },
+                            onEditStudent = {
+                                editingStudent = student
                             }
                         )
                     }
                 }
             }
+        }
+
+        // نافذة تعديل بيانات الطالب
+        if (editingStudent != null) {
+            var editName by remember(editingStudent) { mutableStateOf(editingStudent!!.name) }
+            var editSection by remember(editingStudent) { mutableStateOf(editingStudent!!.section) }
+            var editPhone by remember(editingStudent) { mutableStateOf(editingStudent!!.parentPhone) }
+
+            AlertDialog(
+                onDismissRequest = { editingStudent = null },
+                title = { Text("تعديل بيانات الطالب") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = editName,
+                            onValueChange = { editName = it },
+                            label = { Text("اسم الطالب") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = editSection,
+                            onValueChange = { editSection = it },
+                            label = { Text("الحلقة / الصف") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = editPhone,
+                            onValueChange = { editPhone = it },
+                            label = { Text("رقم ولي الأمر") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (editName.isNotBlank()) {
+                                viewModel.updateStudent(
+                                    editingStudent!!.copy(
+                                        name = editName.trim(),
+                                        section = editSection.trim(),
+                                        parentPhone = editPhone.trim()
+                                    )
+                                )
+                                editingStudent = null
+                                Toast.makeText(context, "تم تحديث بيانات الطالب بنجاح", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    ) {
+                        Text("حفظ التعديل")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { editingStudent = null }) {
+                        Text("إلغاء")
+                    }
+                }
+            )
         }
 
         if (showAlertsDialog) {
@@ -808,10 +874,12 @@ fun AlertItemCard(
 @Composable
 fun StudentRowCard(
     student: Student,
+    isAdmin: Boolean,
     currentStatus: String,
     onMarkAttendance: (String) -> Unit,
     onMarkEvaluation: (String) -> Unit,
-    onGenerateSummaryPdf: () -> Unit
+    onGenerateSummaryPdf: () -> Unit,
+    onEditStudent: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -823,7 +891,7 @@ fun StudentRowCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(text = student.name, style = MaterialTheme.typography.titleMedium)
                     if (student.section.isNotBlank()) {
                         Text(
@@ -834,6 +902,17 @@ fun StudentRowCard(
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isAdmin) {
+                        IconButton(onClick = onEditStudent, modifier = Modifier.size(28.dp)) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "تعديل",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
                     TextButton(
                         onClick = onGenerateSummaryPdf,
                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
