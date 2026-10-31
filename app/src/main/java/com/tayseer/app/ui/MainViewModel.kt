@@ -125,7 +125,7 @@ class MainViewModel(private val appDao: AppDao) : ViewModel() {
 
     fun deleteStudent(student: Student) {
         viewModelScope.launch {
-            appDao.deleteStudent(student)
+            appDao.deleteStudentById(student.id)
         }
     }
 
