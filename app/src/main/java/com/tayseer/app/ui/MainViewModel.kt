@@ -46,7 +46,7 @@ class MainViewModel(private val appDao: AppDao) : ViewModel() {
     val attendanceRecords: StateFlow<List<AttendanceRecord>> = appDao.getAttendanceByDate(todayDateString)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // بيانات بوابة ولي الأمر
+    // بيانات بوابة ولي الأمر (ترتبط بأول طالب كافتراضي عند دخول الحساب)
     private val _parentStudent = MutableStateFlow<Student?>(null)
     val parentStudent: StateFlow<Student?> = _parentStudent.asStateFlow()
 
@@ -66,8 +66,9 @@ class MainViewModel(private val appDao: AppDao) : ViewModel() {
             if (user != null) {
                 _currentUser.value = user
                 _loginError.value = null
-                if (user.role == "PARENT" && user.studentId != null) {
-                    _parentStudent.value = appDao.getStudentById(user.studentId)
+                if (user.role == "PARENT") {
+                    val activeStudents = appDao.getAllActiveStudents().firstOrNull() ?: emptyList()
+                    _parentStudent.value = activeStudents.firstOrNull()
                 }
             } else {
                 _loginError.value = "بيانات الدخول غير صحيحة"
@@ -96,7 +97,7 @@ class MainViewModel(private val appDao: AppDao) : ViewModel() {
 
     fun updateStudent(student: Student) {
         viewModelScope.launch {
-            appDao.updateStudent(student)
+            appDao.insertStudent(student)
         }
     }
 
