@@ -26,6 +26,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tayseer.app.data.AppDatabase
+import com.tayseer.app.data.AttendanceRecord
 import com.tayseer.app.data.Student
 import com.tayseer.app.ui.MainViewModel
 
@@ -199,10 +200,15 @@ fun MainDashboard(viewModel: MainViewModel) {
 @Composable
 fun HomeScreen(viewModel: MainViewModel) {
     val students by viewModel.activeStudents.collectAsState()
+    val attendanceRecords by viewModel.currentAttendance.collectAsState()
     val isHijri by viewModel.isHijri.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
     val context = LocalContext.current
     var evaluationStudent by remember { mutableStateOf<Student?>(null) }
+
+    val attendanceMap = remember(attendanceRecords) {
+        attendanceRecords.associateBy { it.studentId }
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Card(
@@ -253,8 +259,10 @@ fun HomeScreen(viewModel: MainViewModel) {
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(students) { student ->
+                    val currentStatus = attendanceMap[student.id]?.status
                     StudentItemCard(
                         student = student,
+                        currentStatus = currentStatus,
                         onAttendance = { status ->
                             viewModel.setAttendance(student.id, status)
                             Toast.makeText(context, "تم تسجيل: $status للطالب ${student.name}", Toast.LENGTH_SHORT).show()
@@ -278,6 +286,7 @@ fun HomeScreen(viewModel: MainViewModel) {
 @Composable
 fun StudentItemCard(
     student: Student,
+    currentStatus: String?,
     onAttendance: (String) -> Unit,
     onOpenEvaluation: () -> Unit
 ) {
@@ -303,9 +312,25 @@ fun StudentItemCard(
             ) {
                 val statuses = listOf("حاضر", "غائب", "مستأذن", "متأخر", "غائب بعذر", "هارب")
                 statuses.forEach { status ->
+                    val isSelected = (currentStatus == status)
+                    val chipColors = if (isSelected) {
+                        AssistChipDefaults.assistChipColors(
+                            containerColor = when (status) {
+                                "حاضر" -> Color(0xFF2E7D32)
+                                "غائب" -> Color(0xFFC62828)
+                                "متأخر" -> Color(0xFFEF6C00)
+                                else -> MaterialTheme.colorScheme.primary
+                            },
+                            labelColor = Color.White
+                        )
+                    } else {
+                        AssistChipDefaults.assistChipColors()
+                    }
+
                     AssistChip(
                         onClick = { onAttendance(status) },
-                        label = { Text(status, fontSize = 10.sp) }
+                        label = { Text(status, fontSize = 10.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                        colors = chipColors
                     )
                 }
             }
