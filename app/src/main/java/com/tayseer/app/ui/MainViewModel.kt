@@ -125,7 +125,8 @@ class MainViewModel(private val appDao: AppDao) : ViewModel() {
 
     fun deleteStudent(student: Student) {
         viewModelScope.launch {
-            appDao.deleteStudentById(student.id)
+            // أرشفة الطالب بتعطيله (isActive = false) حتى يختفي من القائمة دون الحاجة لدوال إضافية
+            appDao.insertStudent(student.copy(isActive = false))
         }
     }
 
