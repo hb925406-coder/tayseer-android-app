@@ -22,6 +22,9 @@ interface AppDao {
     @Update
     suspend fun updateStudent(student: Student)
 
+    @Delete
+    suspend fun deleteStudent(student: Student)
+
     // --- سجلات الحضور ---
     @Query("SELECT * FROM attendance WHERE date = :date")
     fun getAttendanceByDate(date: String): Flow<List<AttendanceRecord>>
