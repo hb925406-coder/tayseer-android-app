@@ -204,7 +204,10 @@ fun HomeScreen(viewModel: MainViewModel) {
     val isHijri by viewModel.isHijri.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
     val context = LocalContext.current
+
     var evaluationStudent by remember { mutableStateOf<Student?>(null) }
+    var editStudent by remember { mutableStateOf<Student?>(null) }
+    var studentToDelete by remember { mutableStateOf<Student?>(null) }
 
     val attendanceMap = remember(attendanceRecords) {
         attendanceRecords.associateBy { it.studentId }
@@ -267,7 +270,9 @@ fun HomeScreen(viewModel: MainViewModel) {
                             viewModel.setAttendance(student.id, status)
                             Toast.makeText(context, "تم تسجيل: $status للطالب ${student.name}", Toast.LENGTH_SHORT).show()
                         },
-                        onOpenEvaluation = { evaluationStudent = student }
+                        onOpenEvaluation = { evaluationStudent = student },
+                        onEdit = { editStudent = student },
+                        onDelete = { studentToDelete = student }
                     )
                 }
             }
@@ -281,6 +286,43 @@ fun HomeScreen(viewModel: MainViewModel) {
             onDismiss = { evaluationStudent = null }
         )
     }
+
+    editStudent?.let { student ->
+        EditStudentDialog(
+            student = student,
+            onDismiss = { editStudent = null },
+            onConfirm = { updated ->
+                viewModel.updateStudent(updated)
+                Toast.makeText(context, "تم تعديل بيانات الطالب بنجاح", Toast.LENGTH_SHORT).show()
+                editStudent = null
+            }
+        )
+    }
+
+    studentToDelete?.let { student ->
+        AlertDialog(
+            onDismissRequest = { studentToDelete = null },
+            title = { Text("تأكيد الحذف") },
+            text = { Text("هل أنت متأكد من حذف الطالب ${student.name}؟") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteStudent(student)
+                        Toast.makeText(context, "تم حذف الطالب بنجاح", Toast.LENGTH_SHORT).show()
+                        studentToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("حذف")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { studentToDelete = null }) {
+                    Text("إلغاء")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -288,7 +330,9 @@ fun StudentItemCard(
     student: Student,
     currentStatus: String?,
     onAttendance: (String) -> Unit,
-    onOpenEvaluation: () -> Unit
+    onOpenEvaluation: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -297,12 +341,20 @@ fun StudentItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(student.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text("الشعبة: ${student.section}", fontSize = 12.sp, color = Color.Gray)
+                    Text("الشعبة: ${student.section} | هاتف: ${student.parentPhone}", fontSize = 12.sp, color = Color.Gray)
                 }
-                IconButton(onClick = onOpenEvaluation) {
-                    Icon(Icons.Default.Star, contentDescription = "تقييم", tint = Color(0xFFFFB300))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onOpenEvaluation) {
+                        Icon(Icons.Default.Star, contentDescription = "تقييم", tint = Color(0xFFFFB300))
+                    }
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = MaterialTheme.colorScheme.primary)
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -336,6 +388,43 @@ fun StudentItemCard(
             }
         }
     }
+}
+
+@Composable
+fun EditStudentDialog(
+    student: Student,
+    onDismiss: () -> Unit,
+    onConfirm: (Student) -> Unit
+) {
+    var name by remember { mutableStateOf(student.name) }
+    var section by remember { mutableStateOf(student.section) }
+    var phone by remember { mutableStateOf(student.parentPhone) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("تعديل بيانات الطالب") },
+        text = {
+            Column {
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("اسم الطالب") })
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(value = section, onValueChange = { section = it }, label = { Text("الحلقة / الشعبة") })
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("هاتف ولي الأمر") })
+            }
+        },
+        confirmButton = {
+            Button(onClick = {
+                if (name.isNotBlank() && section.isNotBlank()) {
+                    onConfirm(student.copy(name = name, section = section, parentPhone = phone))
+                }
+            }) {
+                Text("حفظ التعديل")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("إلغاء") }
+        }
+    )
 }
 
 @Composable
