@@ -1,62 +1,46 @@
-package com.tayseer.app.utils
+package com.tayseer.app.data
 
-import java.text.SimpleDateFormat
-import java.time.LocalDate
-import java.time.chrono.HijrahDate
-import java.time.format.DateTimeFormatter
-import java.util.Date
-import java.util.Locale
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 
-object DateUtils {
+@Entity(tableName = "users")
+data class User(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val username: String,
+    val passwordHash: String,
+    val role: String // ADMIN, TEACHER, PARENT
+)
 
-    // الحصول على تاريخ اليوم الهجري بصيغة واضحة (مثال: 1448/05/15)
-    fun getTodayHijri(): String {
-        return try {
-            val hijrahDate = HijrahDate.now()
-            val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd", Locale("ar"))
-            formatter.format(hijrahDate)
-        } catch (e: Exception) {
-            // بديل بسيط في حال عدم دعم بعض الأنظمة القديمة
-            val sdf = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
-            sdf.format(Date())
-        }
-    }
+@Entity(tableName = "students")
+data class Student(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val section: String,
+    val parentPhone: String = "",
+    val isActive: Boolean = true
+)
 
-    // الحصول على تاريخ اليوم الميلادي (مثال: 2026/10/26)
-    fun getTodayGregorian(): String {
-        return try {
-            val localDate = LocalDate.now()
-            val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd", Locale.ENGLISH)
-            formatter.format(localDate)
-        } catch (e: Exception) {
-            val sdf = SimpleDateFormat("yyyy/MM/dd", Locale.ENGLISH)
-            sdf.format(Date())
-        }
-    }
+@Entity(tableName = "attendance")
+data class AttendanceRecord(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val studentId: Long,
+    val date: String,
+    val status: String, // حاضر, غائب, مستأذن, متأخر, غائب بعذر, هارب
+    val excuseType: String = "",
+    val excuseReason: String = "",
+    val isResolved: Boolean = false
+)
 
-    // تسميات حالات الحضور الست باللغة العربية
-    fun getStatusLabel(status: String): String {
-        return when (status) {
-            "PRESENT" -> "حاضر"
-            "ABSENT" -> "غائب"
-            "EXCUSED" -> "مستأذن"
-            "LATE" -> "متأخر"
-            "ABSENT_WITH_EXCUSE" -> "غائب بعذر"
-            "ESCAPED" -> "هارب"
-            else -> "حاضر"
-        }
-    }
+@Entity(tableName = "evaluations")
+data class EvaluationRecord(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val studentId: Long,
+    val date: String,
+    val evaluationType: String
+)
 
-    // تسميات التقييمات والسلوك
-    fun getEvaluationLabel(category: String, customName: String = ""): String {
-        return when (category) {
-            "MEMORIZED" -> "حفظه"
-            "NOT_MEMORIZED" -> "لم يحفظ"
-            "EXCELLENT" -> "مميز"
-            "POLITE" -> "مؤدب"
-            "FORGOT_BOOKS" -> "نسيان الكتب"
-            "CUSTOM" -> if (customName.isNotBlank()) customName else "مخصص"
-            else -> category
-        }
-    }
-}
+@Entity(tableName = "custom_evaluations")
+data class CustomEvaluation(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String
+)
