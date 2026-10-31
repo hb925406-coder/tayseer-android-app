@@ -2,194 +2,125 @@ package com.tayseer.app.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.tayseer.app.data.AppDao
-import com.tayseer.app.data.AttendanceRecord
-import com.tayseer.app.data.CustomEvaluation
-import com.tayseer.app.data.EvaluationRecord
-import com.tayseer.app.data.Student
-import com.tayseer.app.data.User
+import com.tayseer.app.data.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
-class MainViewModel(private val appDao: AppDao) : ViewModel() {
+class MainViewModel(private val dao: AppDao) : ViewModel() {
 
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
 
-    private val _loginError = MutableStateFlow<String?>(null)
-    val loginError: StateFlow<String?> = _loginError.asStateFlow()
-
-    init {
-        viewModelScope.launch {
-            ensureDefaultUsersExist()
-        }
-    }
-
-    private suspend fun ensureDefaultUsersExist() {
-        try {
-            if (appDao.getUsersCount() == 0) {
-                appDao.insertUser(User(username = "admin", passwordHash = "123456", role = "ADMIN"))
-                appDao.insertUser(User(username = "teacher", passwordHash = "123456", role = "TEACHER"))
-                appDao.insertUser(User(username = "parent", passwordHash = "123456", role = "PARENT"))
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    val students: StateFlow<List<Student>> = appDao.getAllActiveStudents()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val customEvaluations: StateFlow<List<CustomEvaluation>> = appDao.getAllCustomEvaluations()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val pendingAlerts: StateFlow<List<AttendanceRecord>> = appDao.getPendingAlerts()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val _selectedDate = MutableStateFlow(getCurrentDateString())
+    val selectedDate: StateFlow<String> = _selectedDate.asStateFlow()
 
     private val _isHijri = MutableStateFlow(true)
     val isHijri: StateFlow<Boolean> = _isHijri.asStateFlow()
 
-    private val _selectedSection = MutableStateFlow("الكل")
-    val selectedSection: StateFlow<String> = _selectedSection.asStateFlow()
-
-    val todayDateString: String
-        get() = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-
-    val displayDate: StateFlow<String> = _isHijri.map { hijri ->
-        if (hijri) {
-            "1448/05/20 هـ"
-        } else {
-            todayDateString
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), todayDateString)
-
-    val attendanceRecords: StateFlow<List<AttendanceRecord>> = appDao.getAttendanceByDate(todayDateString)
+    val activeStudents: StateFlow<List<Student>> = dao.getAllActiveStudents()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _parentStudent = MutableStateFlow<Student?>(null)
-    val parentStudent: StateFlow<Student?> = _parentStudent.asStateFlow()
+    val customEvaluations: StateFlow<List<CustomEvaluation>> = dao.getAllCustomEvaluations()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val parentAttendance: StateFlow<List<AttendanceRecord>> = _parentStudent.flatMapLatest { student ->
-        if (student != null) appDao.getAttendanceForStudent(student.id)
-        else flowOf(emptyList())
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val pendingAlerts: StateFlow<List<AttendanceRecord>> = dao.getPendingAlerts()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val parentEvaluations: StateFlow<List<EvaluationRecord>> = _parentStudent.flatMapLatest { student ->
-        if (student != null) appDao.getEvaluationsForStudent(student.id)
-        else flowOf(emptyList())
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val currentAttendance: StateFlow<List<AttendanceRecord>> = _selectedDate
+        .flatMapLatest { date -> dao.getAttendanceByDate(date) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun login(username: String, pass: String) {
+    init {
         viewModelScope.launch {
-            val uName = username.trim()
-            val pWord = pass.trim()
-
-            ensureDefaultUsersExist()
-
-            val user = appDao.login(uName, pWord)
-            if (user != null) {
-                _currentUser.value = user
-                _loginError.value = null
-                if (user.role == "PARENT") {
-                    val activeStudents = appDao.getAllActiveStudents().firstOrNull() ?: emptyList()
-                    _parentStudent.value = activeStudents.firstOrNull()
-                }
-            } else {
-                _loginError.value = "بيانات الدخول غير صحيحة"
+            if (dao.getUsersCount() == 0) {
+                dao.insertUser(User(username = "admin", passwordHash = "admin123", role = "ADMIN"))
+                dao.insertUser(User(username = "teacher", passwordHash = "teacher123", role = "TEACHER"))
             }
         }
     }
 
-    fun logout() {
-        _currentUser.value = null
-        _parentStudent.value = null
+    private fun getCurrentDateString(): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        return sdf.format(Date())
     }
 
     fun toggleCalendarType() {
         _isHijri.value = !_isHijri.value
     }
 
-    fun setSection(section: String) {
-        _selectedSection.value = section
+    fun setDate(date: String) {
+        _selectedDate.value = date
     }
 
-    fun insertStudent(student: Student) {
+    fun login(username: String, password: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
-            appDao.insertStudent(student)
+            val user = dao.login(username, password)
+            _currentUser.value = user
+            onResult(user != null)
         }
     }
 
-    fun updateStudent(student: Student) {
+    fun logout() {
+        _currentUser.value = null
+    }
+
+    fun addStudent(name: String, section: String, parentPhone: String) {
         viewModelScope.launch {
-            appDao.insertStudent(student)
+            dao.insertStudent(Student(name = name, section = section, parentPhone = parentPhone))
         }
     }
 
-    fun deleteStudent(student: Student) {
-        viewModelScope.launch {
-            appDao.insertStudent(student.copy(isActive = false))
-        }
-    }
-
-    fun insertStudentsList(studentsList: List<Student>) {
-        viewModelScope.launch {
-            appDao.insertStudents(studentsList)
-        }
-    }
-
-    fun addCustomEvaluation(title: String) {
-        if (title.isBlank()) return
-        viewModelScope.launch {
-            appDao.insertCustomEvaluation(CustomEvaluation(title = title.trim()))
-        }
-    }
-
-    fun deleteCustomEvaluation(evaluation: CustomEvaluation) {
-        viewModelScope.launch {
-            appDao.deleteCustomEvaluation(evaluation)
-        }
-    }
-
-    fun markAttendance(studentId: Long, status: String) {
+    fun setAttendance(studentId: Long, status: String) {
         viewModelScope.launch {
             val record = AttendanceRecord(
                 studentId = studentId,
-                date = todayDateString,
-                status = status
+                date = _selectedDate.value,
+                status = status,
+                isResolved = (status == "حاضر")
             )
-            appDao.insertAttendance(record)
+            dao.insertAttendance(record)
         }
     }
 
-    fun markAllPresent(currentStudents: List<Student>) {
+    // الدالة المسؤولة عن تحضير كافة الطلاب النشطين دفعة واحدة كـ "حاضر"
+    fun markAllPresent() {
         viewModelScope.launch {
-            currentStudents.forEach { student ->
+            val students = activeStudents.value
+            val date = _selectedDate.value
+            students.forEach { student ->
                 val record = AttendanceRecord(
                     studentId = student.id,
-                    date = todayDateString,
-                    status = "حاضر"
+                    date = date,
+                    status = "حاضر",
+                    isResolved = true
                 )
-                appDao.insertAttendance(record)
+                dao.insertAttendance(record)
             }
         }
     }
 
-    fun markEvaluation(studentId: Long, evaluationType: String) {
+    fun addEvaluation(studentId: Long, evaluationType: String) {
         viewModelScope.launch {
             val record = EvaluationRecord(
                 studentId = studentId,
-                date = todayDateString,
+                date = _selectedDate.value,
                 evaluationType = evaluationType
             )
-            appDao.insertEvaluation(record)
+            dao.insertEvaluation(record)
         }
     }
 
-    fun resolveAlert(recordId: Long, excuseType: String, reason: String) {
+    fun addCustomEvaluation(title: String) {
         viewModelScope.launch {
-            appDao.resolveAlert(recordId, excuseType, reason)
+            dao.insertCustomEvaluation(CustomEvaluation(title = title))
+        }
+    }
+
+    fun resolveAlert(recordId: Long, excuseType: String, excuseReason: String) {
+        viewModelScope.launch {
+            dao.resolveAlert(recordId, excuseType, excuseReason)
         }
     }
 }
