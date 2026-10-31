@@ -36,12 +36,14 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tayseer.app.data.AppDatabase
 import com.tayseer.app.data.AttendanceRecord
+import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Student
 import com.tayseer.app.data.User
 import com.tayseer.app.ui.MainViewModel
 import com.tayseer.app.util.PdfReportGenerator
 import com.tayseer.app.util.StudentImporter
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.FileInputStream
@@ -443,10 +445,10 @@ fun TayseerMainScreen(viewModel: MainViewModel, user: User) {
             try {
                 val database = AppDatabase.getDatabase(context)
                 val attList = withContext(Dispatchers.IO) {
-                    database.appDao().getAttendanceListForStudent(student.id)
+                    database.appDao().getAttendanceForStudent(student.id).firstOrNull() ?: emptyList()
                 }
                 val evalList = withContext(Dispatchers.IO) {
-                    database.appDao().getEvaluationListForStudent(student.id)
+                    database.appDao().getEvaluationsForStudent(student.id).firstOrNull() ?: emptyList()
                 }
 
                 val pdfFile = withContext(Dispatchers.IO) {
