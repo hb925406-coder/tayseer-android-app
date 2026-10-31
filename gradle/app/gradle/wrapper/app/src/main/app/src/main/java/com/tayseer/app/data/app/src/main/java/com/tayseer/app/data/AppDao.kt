@@ -25,6 +25,9 @@ interface AppDao {
     @Delete
     suspend fun deleteStudent(student: Student)
 
+    @Query("DELETE FROM students WHERE id = :studentId")
+    suspend fun deleteStudentById(studentId: Long)
+
     // --- سجلات الحضور ---
     @Query("SELECT * FROM attendance WHERE date = :date")
     fun getAttendanceByDate(date: String): Flow<List<AttendanceRecord>>
