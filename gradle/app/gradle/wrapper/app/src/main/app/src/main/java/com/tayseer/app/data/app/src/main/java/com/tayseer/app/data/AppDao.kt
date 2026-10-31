@@ -57,6 +57,16 @@ interface AppDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEvaluation(record: EvaluationRecord): Long
 
+    // --- التقييمات المخصصة ---
+    @Query("SELECT * FROM custom_evaluations ORDER BY id ASC")
+    fun getAllCustomEvaluations(): Flow<List<CustomEvaluation>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCustomEvaluation(evaluation: CustomEvaluation): Long
+
+    @Delete
+    suspend fun deleteCustomEvaluation(evaluation: CustomEvaluation)
+
     // --- نظام المستخدمين وتسجيل الدخول ---
     @Query("SELECT * FROM users WHERE username = :username AND passwordHash = :password LIMIT 1")
     suspend fun login(username: String, password: String): User?
