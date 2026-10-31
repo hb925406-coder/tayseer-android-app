@@ -72,6 +72,18 @@ class MainViewModel(private val dao: AppDao) : ViewModel() {
         }
     }
 
+    fun updateStudent(student: Student) {
+        viewModelScope.launch {
+            dao.updateStudent(student)
+        }
+    }
+
+    fun deleteStudent(student: Student) {
+        viewModelScope.launch {
+            dao.deleteStudent(student)
+        }
+    }
+
     fun setAttendance(studentId: Long, status: String) {
         viewModelScope.launch {
             val record = AttendanceRecord(
@@ -84,7 +96,6 @@ class MainViewModel(private val dao: AppDao) : ViewModel() {
         }
     }
 
-    // الدالة المسؤولة عن تحضير كافة الطلاب النشطين دفعة واحدة كـ "حاضر"
     fun markAllPresent() {
         viewModelScope.launch {
             val students = activeStudents.value
