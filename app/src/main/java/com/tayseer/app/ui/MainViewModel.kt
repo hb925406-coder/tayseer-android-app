@@ -21,7 +21,6 @@ class MainViewModel(private val appDao: AppDao) : ViewModel() {
     val loginError: StateFlow<String?> = _loginError.asStateFlow()
 
     init {
-        // التأكد الفوري عند تشغيل التطبيق من وجود الحسابات الأساسية وزرعها إن كانت مفقودة
         viewModelScope.launch {
             ensureDefaultUsersExist()
         }
@@ -83,7 +82,6 @@ class MainViewModel(private val appDao: AppDao) : ViewModel() {
             val uName = username.trim()
             val pWord = pass.trim()
 
-            // التأكد أولاً من وجود المستخدمين قبل المقارنة
             ensureDefaultUsersExist()
 
             val user = appDao.login(uName, pWord)
@@ -122,6 +120,12 @@ class MainViewModel(private val appDao: AppDao) : ViewModel() {
     fun updateStudent(student: Student) {
         viewModelScope.launch {
             appDao.insertStudent(student)
+        }
+    }
+
+    fun deleteStudent(student: Student) {
+        viewModelScope.launch {
+            appDao.deleteStudent(student)
         }
     }
 
