@@ -53,8 +53,10 @@ fun TayseerApp(viewModel: MainViewModel) {
     val currentUser by viewModel.currentUser.collectAsState()
 
     if (currentUser == null) {
-        LoginScreen(onLogin = { username, password ->
-            viewModel.login(username, password) { success -> }
+        LoginScreen(onLogin = { username, password, callback ->
+            viewModel.login(username, password) { success ->
+                callback(success)
+            }
         })
     } else {
         MainDashboard(viewModel)
@@ -62,9 +64,10 @@ fun TayseerApp(viewModel: MainViewModel) {
 }
 
 @Composable
-fun LoginScreen(onLogin: (String, String) -> Unit) {
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+fun LoginScreen(onLogin: (String, String, (Boolean) -> Unit) -> Unit) {
+    var username by remember { mutableStateOf("admin") }
+    var password by remember { mutableStateOf("admin123") }
+    var errorMessage by remember { mutableStateOf("") }
     val context = LocalContext.current
 
     Column(
@@ -81,7 +84,10 @@ fun LoginScreen(onLogin: (String, String) -> Unit) {
 
         OutlinedTextField(
             value = username,
-            onValueChange = { username = it },
+            onValueChange = { 
+                username = it
+                errorMessage = ""
+            },
             label = { Text("اسم المستخدم") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
@@ -90,20 +96,36 @@ fun LoginScreen(onLogin: (String, String) -> Unit) {
 
         OutlinedTextField(
             value = password,
-            onValueChange = { password = it },
+            onValueChange = { 
+                password = it
+                errorMessage = ""
+            },
             label = { Text("كلمة المرور") },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true
         )
+
+        if (errorMessage.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(errorMessage, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+        }
+
         Spacer(modifier = Modifier.height(24.dp))
 
         Button(
             onClick = {
-                if (username.isNotBlank() && password.isNotBlank()) {
-                    onLogin(username, password)
+                val trimmedUser = username.trim()
+                val trimmedPass = password.trim()
+                if (trimmedUser.isNotBlank() && trimmedPass.isNotBlank()) {
+                    onLogin(trimmedUser, trimmedPass) { success ->
+                        if (!success) {
+                            errorMessage = "اسم المستخدم أو كلمة المرور غير صحيحة"
+                            Toast.makeText(context, "فشل تسجيل الدخول: تأكد من البيانات", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 } else {
-                    Toast.makeText(context, "يرجى إدخال اسم المستخدم وكلمة المرور", Toast.LENGTH_SHORT).show()
+                    errorMessage = "يرجى إدخال اسم المستخدم وكلمة المرور"
                 }
             },
             modifier = Modifier
@@ -183,7 +205,6 @@ fun HomeScreen(viewModel: MainViewModel) {
     var evaluationStudent by remember { mutableStateOf<Student?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        // الشريط العلوي والتقويم
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
@@ -210,7 +231,6 @@ fun HomeScreen(viewModel: MainViewModel) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // زر تحضير الكل حاضر
         Button(
             onClick = {
                 viewModel.markAllPresent()
@@ -226,7 +246,6 @@ fun HomeScreen(viewModel: MainViewModel) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // قائمة الطلاب
         if (students.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("لا يوجد طلاب مسجلون حالياً. اضغط (+) لإضافة طالب.")
