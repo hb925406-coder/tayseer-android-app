@@ -28,6 +28,9 @@ data class User(
     @ColumnInfo(name = "username")
     val username: String = "",
 
+    @ColumnInfo(name = "passwordHash")
+    val passwordHash: String = "",
+
     @ColumnInfo(name = "role")
     val role: Role = Role.ADMIN,
 
@@ -62,11 +65,14 @@ data class Student(
     @ColumnInfo(name = "parentPhone")
     val parentPhone: String = "",
 
-    @ColumnInfo(name = "isArchived")
-    val isArchived: Boolean = false
-)
+    @ColumnInfo(name = "isActive")
+    val isActive: Boolean = true
+) {
+    val isArchived: Boolean
+        get() = !isActive
+}
 
-@Entity(tableName = "attendance_records")
+@Entity(tableName = "attendance")
 data class AttendanceRecord(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "id")
@@ -108,7 +114,7 @@ data class CustomEvaluation(
     val isPositive: Boolean = true
 )
 
-@Entity(tableName = "evaluation_records")
+@Entity(tableName = "evaluations")
 data class EvaluationRecord(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "id")
