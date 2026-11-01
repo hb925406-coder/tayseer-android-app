@@ -81,8 +81,10 @@ fun StudentScreen(viewModel: StudentViewModel) {
         todayAttendance.associateBy { it.studentId }
     }
 
-    val presentCount = todayAttendance.count { it.status == AttendanceStatus.PRESENT }
-    val absentCount = todayAttendance.count { it.status == AttendanceStatus.ABSENT || it.status == AttendanceStatus.ABSENT_WITH_EXCUSE }
+    val presentCount = todayAttendance.count { it.statusEnum == AttendanceStatus.PRESENT }
+    val absentCount = todayAttendance.count { 
+        it.statusEnum == AttendanceStatus.ABSENT || it.statusEnum == AttendanceStatus.ABSENT_WITH_EXCUSE 
+    }
 
     Scaffold(
         topBar = {
@@ -155,7 +157,7 @@ fun StudentScreen(viewModel: StudentViewModel) {
                 ) {
                     items(students) { student ->
                         val record = attendanceMap[student.id]
-                        val currentStatus = record?.status ?: AttendanceStatus.PRESENT
+                        val currentStatus = record?.statusEnum ?: AttendanceStatus.PRESENT
                         val statusColor = when (currentStatus) {
                             AttendanceStatus.PRESENT -> Color(0xFF2E7D32)
                             AttendanceStatus.ABSENT, AttendanceStatus.TRUANT -> Color(0xFFC62828)
