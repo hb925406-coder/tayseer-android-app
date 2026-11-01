@@ -5,20 +5,10 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(
-    entities = [
-        User::class,
-        Student::class,
-        AttendanceRecord::class,
-        EvaluationRecord::class,
-        CustomEvaluation::class
-    ],
-    version = 3,
-    exportSchema = false
-)
+@Database(entities = [Student::class], version = 1, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
 
-    abstract fun appDao(): AppDao
+    abstract fun studentDao(): StudentDao
 
     companion object {
         @Volatile
@@ -31,8 +21,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "tayseer_database"
                 )
-                    .fallbackToDestructiveMigration()
-                    .build()
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }
