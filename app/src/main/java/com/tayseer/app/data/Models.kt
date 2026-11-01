@@ -93,6 +93,9 @@ data class AttendanceRecord(
     @ColumnInfo(name = "excuseType")
     val excuseType: String = "",
 
+    @ColumnInfo(name = "excuseReason")
+    val excuseReason: String = "",
+
     @ColumnInfo(name = "isResolved")
     val isResolved: Boolean = false
 ) {
