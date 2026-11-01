@@ -1,27 +1,9 @@
 package com.tayseer.app.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-
-enum class AttendanceStatus(val arabicLabel: String) {
-    PRESENT("حاضر"),
-    ABSENT("غائب"),
-    EXCUSED("مستأذن"),
-    LATE("متأخر"),
-    ABSENT_WITH_EXCUSE("غائب بعذر"),
-    TRUANT("هارب");
-
-    companion object {
-        fun fromName(name: String?): AttendanceStatus {
-            return try {
-                if (name != null) valueOf(name) else PRESENT
-            } catch (e: Exception) {
-                PRESENT
-            }
-        }
-    }
-}
 
 @Entity(
     tableName = "attendance_records",
@@ -31,9 +13,18 @@ enum class AttendanceStatus(val arabicLabel: String) {
 )
 data class AttendanceRecord(
     @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
     val id: Long = 0,
-    val studentId: Long = 0,
-    val date: String = "",
-    val status: String = "PRESENT",
+
+    @ColumnInfo(name = "studentId")
+    val studentId: Long,
+
+    @ColumnInfo(name = "date")
+    val date: String,
+
+    @ColumnInfo(name = "status")
+    val status: String,
+
+    @ColumnInfo(name = "reasonNote")
     val reasonNote: String = ""
 )
