@@ -1,6 +1,11 @@
 package com.tayseer.app.data
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -24,8 +29,8 @@ interface AttendanceDao {
     @Update
     suspend fun updateAttendance(record: AttendanceRecord)
 
-    @Query("DELETE FROM attendance_records WHERE id = :recordId")
-    suspend fun deleteRecord(recordId: Long)
+    @Delete
+    suspend fun deleteRecord(record: AttendanceRecord)
 
     @Query("SELECT COUNT(*) FROM attendance_records WHERE studentId = :studentId AND status = :status")
     suspend fun countStatusForStudent(studentId: Long, status: String): Int
