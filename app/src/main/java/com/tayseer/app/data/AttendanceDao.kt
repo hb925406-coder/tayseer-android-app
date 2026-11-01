@@ -4,7 +4,6 @@ import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-@TypeConverters(Converters::class)
 interface AttendanceDao {
 
     @Query("SELECT * FROM attendance_records WHERE date = :date")
@@ -29,5 +28,5 @@ interface AttendanceDao {
     suspend fun deleteRecord(recordId: Long)
 
     @Query("SELECT COUNT(*) FROM attendance_records WHERE studentId = :studentId AND status = :status")
-    suspend fun countStatusForStudent(studentId: Long, status: AttendanceStatus): Int
+    suspend fun countStatusForStudent(studentId: Long, status: String): Int
 }
