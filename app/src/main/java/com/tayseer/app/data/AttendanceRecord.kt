@@ -3,6 +3,7 @@ package com.tayseer.app.data
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import androidx.room.TypeConverters
 
 enum class AttendanceStatus(val arabicLabel: String) {
     PRESENT("حاضر"),
@@ -19,6 +20,7 @@ enum class AttendanceStatus(val arabicLabel: String) {
         Index(value = ["studentId", "date"], unique = true)
     ]
 )
+@TypeConverters(Converters::class)
 data class AttendanceRecord(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
