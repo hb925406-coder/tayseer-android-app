@@ -14,7 +14,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,7 +41,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    StudentScreen(viewModel = viewModel)
+                    TayseerMainApp(viewModel = viewModel)
                 }
             }
         }
@@ -48,11 +50,51 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StudentScreen(viewModel: StudentViewModel) {
+fun TayseerMainApp(viewModel: StudentViewModel) {
     val context = LocalContext.current
+    var selectedTab by remember { mutableStateOf(0) }
+    val statusMessage by viewModel.importStatusMessage.collectAsState()
+
+    LaunchedEffect(statusMessage) {
+        statusMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.clearStatusMessage()
+        }
+    }
+
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                NavigationBarItem(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    icon = { Icon(Icons.Default.CheckCircle, contentDescription = "الحضور") },
+                    label = { Text("الحضور والغياب") }
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    icon = { Icon(Icons.Default.Star, contentDescription = "التقييمات") },
+                    label = { Text("التقييم والسلوك") }
+                )
+            }
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding)) {
+            if (selectedTab == 0) {
+                AttendanceScreen(viewModel = viewModel)
+            } else {
+                EvaluationsScreen(viewModel = viewModel)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AttendanceScreen(viewModel: StudentViewModel) {
     val students by viewModel.students.collectAsState()
     val todayAttendance by viewModel.todayAttendance.collectAsState()
-    val statusMessage by viewModel.importStatusMessage.collectAsState()
     val currentDate by viewModel.currentDate.collectAsState()
 
     var showAddDialog by remember { mutableStateOf(false) }
@@ -65,16 +107,7 @@ fun StudentScreen(viewModel: StudentViewModel) {
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        uri?.let {
-            viewModel.importStudentsFromCsv(it)
-        }
-    }
-
-    LaunchedEffect(statusMessage) {
-        statusMessage?.let {
-            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-            viewModel.clearStatusMessage()
-        }
+        uri?.let { viewModel.importStudentsFromCsv(it) }
     }
 
     val attendanceMap = remember(todayAttendance) {
@@ -92,25 +125,19 @@ fun StudentScreen(viewModel: StudentViewModel) {
                 title = { Text("تيسير - متابعة الحضور") },
                 actions = {
                     IconButton(onClick = { viewModel.setAllPresentForToday() }) {
-                        Icon(
-                            imageVector = Icons.Default.DoneAll,
-                            contentDescription = "تحضير الكل كحاضر"
-                        )
+                        Icon(Icons.Default.DoneAll, contentDescription = "تحضير الكل كحاضر")
                     }
                     IconButton(onClick = {
                         filePickerLauncher.launch(arrayOf("text/*", "application/*"))
                     }) {
-                        Icon(
-                            imageVector = Icons.Default.UploadFile,
-                            contentDescription = "استيراد ملف"
-                        )
+                        Icon(Icons.Default.UploadFile, contentDescription = "استيراد ملف")
                     }
                 }
             )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "إضافة طالب")
+                Icon(Icons.Default.Add, contentDescription = "إضافة طالب")
             }
         }
     ) { paddingValues ->
@@ -149,12 +176,10 @@ fun StudentScreen(viewModel: StudentViewModel) {
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("لا يوجد طلاب مسجلون حالياً. استخدم زر الاستيراد أو زر + لإضافة طلاب.")
+                    Text("لا يوجد طلاب مسجلون حالياً. استخدم زر + لإضافة طالب.")
                 }
             } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(students) { student ->
                         val record = attendanceMap[student.id]
                         val currentStatus = record?.statusEnum ?: AttendanceStatus.PRESENT
@@ -181,14 +206,8 @@ fun StudentScreen(viewModel: StudentViewModel) {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = student.name,
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-                                    Text(
-                                        text = "الحلقة/الشعبة: ${student.section}",
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
+                                    Text(text = student.name, style = MaterialTheme.typography.titleMedium)
+                                    Text(text = "الحلقة/الشعبة: ${student.section}", style = MaterialTheme.typography.bodySmall)
                                     if (!record?.reasonNote.isNullOrBlank()) {
                                         Text(
                                             text = "ملاحظة: ${record?.reasonNote}",
@@ -216,7 +235,6 @@ fun StudentScreen(viewModel: StudentViewModel) {
             }
         }
 
-        // نافذة اختيار حالة الحضور للطالب
         selectedStudentForAttendance?.let { student ->
             AlertDialog(
                 onDismissRequest = { selectedStudentForAttendance = null },
@@ -257,7 +275,6 @@ fun StudentScreen(viewModel: StudentViewModel) {
             )
         }
 
-        // نافذة إضافة طالب يدوي
         if (showAddDialog) {
             AlertDialog(
                 onDismissRequest = { showAddDialog = false },
@@ -299,6 +316,116 @@ fun StudentScreen(viewModel: StudentViewModel) {
                 },
                 dismissButton = {
                     TextButton(onClick = { showAddDialog = false }) {
+                        Text("إلغاء")
+                    }
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EvaluationsScreen(viewModel: StudentViewModel) {
+    val students by viewModel.students.collectAsState()
+    var selectedStudentForEval by remember { mutableStateOf<Student?>(null) }
+    var evalNoteInput by remember { mutableStateOf("") }
+
+    val defaultEvals = listOf("حفظه", "لم يحفظ", "مميز", "مؤدب", "نسيان الكتب")
+
+    Scaffold(
+        topBar = {
+            TopAppBar(title = { Text("تيسير - التقييم والسلوك") })
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "اختر طالباً لتسجيل تقييم وسلوك يومي له:",
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            if (students.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("لا يوجد طلاب مسجلون حالياً.")
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(students) { student ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedStudentForEval = student
+                                    evalNoteInput = ""
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(text = student.name, style = MaterialTheme.typography.titleMedium)
+                                    Text(text = "الحلقة/الشعبة: ${student.section}", style = MaterialTheme.typography.bodySmall)
+                                }
+                                Button(onClick = {
+                                    selectedStudentForEval = student
+                                    evalNoteInput = ""
+                                }) {
+                                    Text("تقييم")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        selectedStudentForEval?.let { student ->
+            AlertDialog(
+                onDismissRequest = { selectedStudentForEval = null },
+                title = { Text("تقييم الطالب: ${student.name}") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("اختر التقييم السريع:")
+                        defaultEvals.forEach { evalType ->
+                            OutlinedButton(
+                                onClick = {
+                                    viewModel.addEvaluation(
+                                        studentId = student.id,
+                                        evaluationType = evalType,
+                                        note = evalNoteInput.trim()
+                                    )
+                                    selectedStudentForEval = null
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(evalType)
+                            }
+                        }
+                        OutlinedTextField(
+                            value = evalNoteInput,
+                            onValueChange = { evalNoteInput = it },
+                            label = { Text("ملاحظة إضافية (اختياري)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { selectedStudentForEval = null }) {
                         Text("إلغاء")
                     }
                 }
