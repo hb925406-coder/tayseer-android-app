@@ -1,46 +1,65 @@
 package com.tayseer.app.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "users")
-data class User(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val username: String,
-    val passwordHash: String,
-    val role: String // ADMIN, TEACHER, PARENT
-)
+enum class AttendanceStatus(val arabicTitle: String) {
+    PRESENT("حاضر"),
+    ABSENT("غائب"),
+    EXCUSED("مستأذن"),
+    LATE("متأخر"),
+    ABSENT_WITH_EXCUSE("غائب بعذر"),
+    ESCAPED("هارب")
+}
 
 @Entity(tableName = "students")
 data class Student(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val name: String,
-    val section: String,
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
+    val id: Long = 0,
+
+    @ColumnInfo(name = "name")
+    val name: String = "",
+
+    @ColumnInfo(name = "grade")
+    val grade: String = "",
+
+    @ColumnInfo(name = "groupName")
+    val groupName: String = "",
+
+    @ColumnInfo(name = "parentPhone")
     val parentPhone: String = "",
-    val isActive: Boolean = true
+
+    @ColumnInfo(name = "isArchived")
+    val isArchived: Boolean = false
 )
 
-@Entity(tableName = "attendance")
+@Entity(tableName = "attendance_records")
 data class AttendanceRecord(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val studentId: Long,
-    val date: String,
-    val status: String, // حاضر, غائب, مستأذن, متأخر, غائب بعذر, هارب
-    val excuseType: String = "",
-    val excuseReason: String = "",
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
+    val id: Long = 0,
+
+    @ColumnInfo(name = "studentId")
+    val studentId: Long = 0,
+
+    @ColumnInfo(name = "date")
+    val date: String = "",
+
+    @ColumnInfo(name = "status")
+    val status: String = "PRESENT",
+
+    @ColumnInfo(name = "reasonNote")
+    val reasonNote: String = "",
+
+    @ColumnInfo(name = "isResolved")
     val isResolved: Boolean = false
-)
-
-@Entity(tableName = "evaluations")
-data class EvaluationRecord(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val studentId: Long,
-    val date: String,
-    val evaluationType: String
-)
-
-@Entity(tableName = "custom_evaluations")
-data class CustomEvaluation(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val title: String
-)
+) {
+    val statusEnum: AttendanceStatus
+        get() = try {
+            AttendanceStatus.valueOf(status)
+        } catch (e: Exception) {
+            AttendanceStatus.PRESENT
+        }
+}
