@@ -3,7 +3,6 @@ package com.tayseer.app.data
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
-import androidx.room.TypeConverters
 
 enum class AttendanceStatus(val arabicLabel: String) {
     PRESENT("حاضر"),
@@ -11,7 +10,17 @@ enum class AttendanceStatus(val arabicLabel: String) {
     EXCUSED("مستأذن"),
     LATE("متأخر"),
     ABSENT_WITH_EXCUSE("غائب بعذر"),
-    TRUANT("هارب")
+    TRUANT("هارب");
+
+    companion object {
+        fun fromName(name: String): AttendanceStatus {
+            return try {
+                valueOf(name)
+            } catch (e: Exception) {
+                PRESENT
+            }
+        }
+    }
 }
 
 @Entity(
@@ -20,12 +29,14 @@ enum class AttendanceStatus(val arabicLabel: String) {
         Index(value = ["studentId", "date"], unique = true)
     ]
 )
-@TypeConverters(Converters::class)
 data class AttendanceRecord(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val studentId: Long,
     val date: String,
-    val status: AttendanceStatus = AttendanceStatus.PRESENT,
+    val status: String = AttendanceStatus.PRESENT.name,
     val reasonNote: String = ""
-)
+) {
+    val statusEnum: AttendanceStatus
+        get() = AttendanceStatus.fromName(status)
+}
