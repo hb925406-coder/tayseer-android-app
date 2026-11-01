@@ -4,14 +4,33 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-enum class AttendanceStatus(val arabicTitle: String) {
-    PRESENT("حاضر"),
-    ABSENT("غائب"),
-    EXCUSED("مستأذن"),
-    LATE("متأخر"),
-    ABSENT_WITH_EXCUSE("غائب بعذر"),
-    ESCAPED("هارب")
+enum class Role {
+    ADMIN,
+    TEACHER,
+    PARENT
 }
+
+@Entity(tableName = "users")
+data class User(
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
+    val id: Long = 0,
+
+    @ColumnInfo(name = "username")
+    val username: String = "",
+
+    @ColumnInfo(name = "role")
+    val role: Role = Role.ADMIN,
+
+    @ColumnInfo(name = "assignedSection")
+    val assignedSection: String = "",
+
+    @ColumnInfo(name = "assignedSubject")
+    val assignedSubject: String = "",
+
+    @ColumnInfo(name = "studentId")
+    val studentId: Long? = null
+)
 
 @Entity(tableName = "students")
 data class Student(
@@ -24,6 +43,9 @@ data class Student(
 
     @ColumnInfo(name = "grade")
     val grade: String = "",
+
+    @ColumnInfo(name = "section")
+    val section: String = "",
 
     @ColumnInfo(name = "groupName")
     val groupName: String = "",
@@ -63,3 +85,35 @@ data class AttendanceRecord(
             AttendanceStatus.PRESENT
         }
 }
+
+@Entity(tableName = "custom_evaluations")
+data class CustomEvaluation(
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
+    val id: Long = 0,
+
+    @ColumnInfo(name = "title")
+    val title: String = "",
+
+    @ColumnInfo(name = "isPositive")
+    val isPositive: Boolean = true
+)
+
+@Entity(tableName = "evaluation_records")
+data class EvaluationRecord(
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
+    val id: Long = 0,
+
+    @ColumnInfo(name = "studentId")
+    val studentId: Long = 0,
+
+    @ColumnInfo(name = "date")
+    val date: String = "",
+
+    @ColumnInfo(name = "evaluationType")
+    val evaluationType: String = "",
+
+    @ColumnInfo(name = "note")
+    val note: String = ""
+)
