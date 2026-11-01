@@ -1,542 +1,136 @@
 package com.tayseer.app
 
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.tayseer.app.data.AppDatabase
-import com.tayseer.app.data.AttendanceRecord
 import com.tayseer.app.data.Student
-import com.tayseer.app.ui.MainViewModel
+import com.tayseer.app.ui.StudentViewModel
 
 class MainActivity : ComponentActivity() {
+
+    private val viewModel: StudentViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val database = AppDatabase.getDatabase(applicationContext)
-        val factory = object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                @Suppress("UNCHECKED_CAST")
-                return MainViewModel(database.appDao()) as T
-            }
-        }
         setContent {
             MaterialTheme {
-                val viewModel: MainViewModel = viewModel(factory = factory)
-                TayseerApp(viewModel)
-            }
-        }
-    }
-}
-
-@Composable
-fun TayseerApp(viewModel: MainViewModel) {
-    val currentUser by viewModel.currentUser.collectAsState()
-
-    if (currentUser == null) {
-        LoginScreen(onLogin = { username, password, callback ->
-            viewModel.login(username, password) { success ->
-                callback(success)
-            }
-        })
-    } else {
-        MainDashboard(viewModel)
-    }
-}
-
-@Composable
-fun LoginScreen(onLogin: (String, String, (Boolean) -> Unit) -> Unit) {
-    var username by remember { mutableStateOf("admin") }
-    var password by remember { mutableStateOf("admin123") }
-    var errorMessage by remember { mutableStateOf("") }
-    val context = LocalContext.current
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("تطبيق تيسير", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("نظام إدارة الحضور والتقييم الذكي", fontSize = 14.sp, color = Color.Gray)
-        Spacer(modifier = Modifier.height(32.dp))
-
-        OutlinedTextField(
-            value = username,
-            onValueChange = { 
-                username = it
-                errorMessage = ""
-            },
-            label = { Text("اسم المستخدم") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = { 
-                password = it
-                errorMessage = ""
-            },
-            label = { Text("كلمة المرور") },
-            visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
-        )
-
-        if (errorMessage.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(errorMessage, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(
-            onClick = {
-                val trimmedUser = username.trim()
-                val trimmedPass = password.trim()
-                if (trimmedUser.isNotBlank() && trimmedPass.isNotBlank()) {
-                    onLogin(trimmedUser, trimmedPass) { success ->
-                        if (!success) {
-                            errorMessage = "اسم المستخدم أو كلمة المرور غير صحيحة"
-                            Toast.makeText(context, "فشل تسجيل الدخول: تأكد من البيانات", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                } else {
-                    errorMessage = "يرجى إدخال اسم المستخدم وكلمة المرور"
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    StudentScreen(viewModel = viewModel)
                 }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp)
-        ) {
-            Text("تسجيل الدخول", fontSize = 16.sp)
+            }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainDashboard(viewModel: MainViewModel) {
-    var currentTab by remember { mutableStateOf(0) }
-    val pendingAlerts by viewModel.pendingAlerts.collectAsState()
-    var showAddStudentDialog by remember { mutableStateOf(false) }
+fun StudentScreen(viewModel: StudentViewModel) {
+    val context = LocalContext.current
+    val students by viewModel.students.collectAsState()
+    val statusMessage by viewModel.importStatusMessage.collectAsState()
+
+    var showAddDialog by remember { mutableStateOf(false) }
+    var studentNameInput by remember { mutableStateOf("") }
+    var studentSectionInput by remember { mutableStateOf("") }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            viewModel.importStudentsFromCsv(it)
+        }
+    }
+
+    LaunchedEffect(statusMessage) {
+        statusMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.clearStatusMessage()
+        }
+    }
 
     Scaffold(
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = currentTab == 0,
-                    onClick = { currentTab = 0 },
-                    icon = { Icon(Icons.Default.Home, contentDescription = "الرئيسية") },
-                    label = { Text("الرئيسية") }
-                )
-                NavigationBarItem(
-                    selected = currentTab == 1,
-                    onClick = { currentTab = 1 },
-                    icon = {
-                        BadgedBox(badge = {
-                            if (pendingAlerts.isNotEmpty()) {
-                                Badge { Text(pendingAlerts.size.toString()) }
-                            }
-                        }) {
-                            Icon(Icons.Default.Notifications, contentDescription = "التنبيهات")
-                        }
-                    },
-                    label = { Text("التنبيهات") }
-                )
-            }
+        topBar = {
+            TopAppBar(
+                title = { Text("تطبيق تيسير - إدارة الطلاب") },
+                actions = {
+                    IconButton(onClick = {
+                        filePickerLauncher.launch(arrayOf("text/*", "application/*"))
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.UploadFile,
+                            contentDescription = "استيراد ملف"
+                        )
+                    }
+                }
+            )
         },
         floatingActionButton = {
-            if (currentTab == 0) {
-                FloatingActionButton(onClick = { showAddStudentDialog = true }) {
-                    Icon(Icons.Default.Add, contentDescription = "إضافة طالب")
-                }
+            FloatingActionButton(onClick = { showAddDialog = true }) {
+                Icon(imageVector = Icons.Default.Add, contentDescription = "إضافة طالب")
             }
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.padding(paddingValues)) {
-            when (currentTab) {
-                0 -> HomeScreen(viewModel)
-                1 -> AlertsScreen(viewModel)
-            }
-
-            if (showAddStudentDialog) {
-                AddStudentDialog(
-                    onDismiss = { showAddStudentDialog = false },
-                    onConfirm = { name, section, phone ->
-                        viewModel.addStudent(name, section, phone)
-                        showAddStudentDialog = false
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun HomeScreen(viewModel: MainViewModel) {
-    val students by viewModel.activeStudents.collectAsState()
-    val attendanceRecords by viewModel.currentAttendance.collectAsState()
-    val isHijri by viewModel.isHijri.collectAsState()
-    val selectedDate by viewModel.selectedDate.collectAsState()
-    val context = LocalContext.current
-
-    var evaluationStudent by remember { mutableStateOf<Student?>(null) }
-    var editStudent by remember { mutableStateOf<Student?>(null) }
-    var studentToDelete by remember { mutableStateOf<Student?>(null) }
-
-    val attendanceMap = remember(attendanceRecords) {
-        attendanceRecords.associateBy { it.studentId }
-    }
-
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("نظام تيسير", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Text(
-                        text = if (isHijri) "التاريخ (هجري): $selectedDate" else "التاريخ (ميلادي): $selectedDate",
-                        fontSize = 14.sp
-                    )
-                }
-                IconButton(onClick = { viewModel.toggleCalendarType() }) {
-                    Icon(Icons.Default.DateRange, contentDescription = "تبديل التقويم")
-                }
-            }
-        }
+            Text(
+                text = "إجمالي الطلاب المسجلين: ${students.size}",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Button(
-            onClick = {
-                viewModel.markAllPresent()
-                Toast.makeText(context, "تم تحضير جميع الطلاب كـ حاضر", Toast.LENGTH_SHORT).show()
-            },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-        ) {
-            Icon(Icons.Default.DoneAll, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("تحضير الكل حاضر")
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        if (students.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("لا يوجد طلاب مسجلون حالياً. اضغط (+) لإضافة طالب.")
-            }
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(students) { student ->
-                    val currentStatus = attendanceMap[student.id]?.status
-                    StudentItemCard(
-                        student = student,
-                        currentStatus = currentStatus,
-                        onAttendance = { status ->
-                            viewModel.setAttendance(student.id, status)
-                            Toast.makeText(context, "تم تسجيل: $status للطالب ${student.name}", Toast.LENGTH_SHORT).show()
-                        },
-                        onOpenEvaluation = { evaluationStudent = student },
-                        onEdit = { editStudent = student },
-                        onDelete = { studentToDelete = student }
-                    )
-                }
-            }
-        }
-    }
-
-    evaluationStudent?.let { student ->
-        EvaluationDialog(
-            student = student,
-            viewModel = viewModel,
-            onDismiss = { evaluationStudent = null }
-        )
-    }
-
-    editStudent?.let { student ->
-        EditStudentDialog(
-            student = student,
-            onDismiss = { editStudent = null },
-            onConfirm = { updated ->
-                viewModel.updateStudent(updated)
-                Toast.makeText(context, "تم تعديل بيانات الطالب بنجاح", Toast.LENGTH_SHORT).show()
-                editStudent = null
-            }
-        )
-    }
-
-    studentToDelete?.let { student ->
-        AlertDialog(
-            onDismissRequest = { studentToDelete = null },
-            title = { Text("تأكيد الحذف") },
-            text = { Text("هل أنت متأكد من حذف الطالب ${student.name}؟") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.deleteStudent(student)
-                        Toast.makeText(context, "تم حذف الطالب بنجاح", Toast.LENGTH_SHORT).show()
-                        studentToDelete = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            if (students.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text("حذف")
+                    Text("لا يوجد طلاب مسجلون حالياً. اضغط على أيقونة الملف لاستيراد قائمة الطلاب أو زر + لإضافة طالب.")
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { studentToDelete = null }) {
-                    Text("إلغاء")
-                }
-            }
-        )
-    }
-}
-
-@Composable
-fun StudentItemCard(
-    student: Student,
-    currentStatus: String?,
-    onAttendance: (String) -> Unit,
-    onOpenEvaluation: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(student.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    Text("الشعبة: ${student.section} | هاتف: ${student.parentPhone}", fontSize = 12.sp, color = Color.Gray)
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onOpenEvaluation) {
-                        Icon(Icons.Default.Star, contentDescription = "تقييم", tint = Color(0xFFFFB300))
-                    }
-                    IconButton(onClick = onEdit) {
-                        Icon(Icons.Default.Edit, contentDescription = "تعديل", tint = MaterialTheme.colorScheme.primary)
-                    }
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = MaterialTheme.colorScheme.error)
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                val statuses = listOf("حاضر", "غائب", "مستأذن", "متأخر", "غائب بعذر", "هارب")
-                statuses.forEach { status ->
-                    val isSelected = (currentStatus == status)
-                    val chipColors = if (isSelected) {
-                        AssistChipDefaults.assistChipColors(
-                            containerColor = when (status) {
-                                "حاضر" -> Color(0xFF2E7D32)
-                                "غائب" -> Color(0xFFC62828)
-                                "متأخر" -> Color(0xFFEF6C00)
-                                else -> MaterialTheme.colorScheme.primary
-                            },
-                            labelColor = Color.White
-                        )
-                    } else {
-                        AssistChipDefaults.assistChipColors()
-                    }
-
-                    AssistChip(
-                        onClick = { onAttendance(status) },
-                        label = { Text(status, fontSize = 10.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
-                        colors = chipColors
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun EditStudentDialog(
-    student: Student,
-    onDismiss: () -> Unit,
-    onConfirm: (Student) -> Unit
-) {
-    var name by remember { mutableStateOf(student.name) }
-    var section by remember { mutableStateOf(student.section) }
-    var phone by remember { mutableStateOf(student.parentPhone) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("تعديل بيانات الطالب") },
-        text = {
-            Column {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("اسم الطالب") })
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(value = section, onValueChange = { section = it }, label = { Text("الحلقة / الشعبة") })
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("هاتف ولي الأمر") })
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                if (name.isNotBlank() && section.isNotBlank()) {
-                    onConfirm(student.copy(name = name, section = section, parentPhone = phone))
-                }
-            }) {
-                Text("حفظ التعديل")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("إلغاء") }
-        }
-    )
-}
-
-@Composable
-fun EvaluationDialog(
-    student: Student,
-    viewModel: MainViewModel,
-    onDismiss: () -> Unit
-) {
-    val customEvals by viewModel.customEvaluations.collectAsState()
-    val context = LocalContext.current
-    var showAddCustom by remember { mutableStateOf(false) }
-    var customTitle by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("تقييم الطالب: ${student.name}") },
-        text = {
-            Column {
-                Text("التقييمات الأساسية:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    listOf("حفظه", "لم يحفظ", "مميز", "مؤدب", "نسيان الكتب").forEach { item ->
-                        FilledTonalButton(onClick = {
-                            viewModel.addEvaluation(student.id, item)
-                            Toast.makeText(context, "تم تسجيل: $item", Toast.LENGTH_SHORT).show()
-                            onDismiss()
-                        }) {
-                            Text(item, fontSize = 11.sp)
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("تقييمات مخصصة:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    IconButton(onClick = { showAddCustom = true }) {
-                        Icon(Icons.Default.Add, contentDescription = "إضافة تقييم مخصص")
-                    }
-                }
-                if (showAddCustom) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
-                            value = customTitle,
-                            onValueChange = { customTitle = it },
-                            placeholder = { Text("اسم التقييم") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(onClick = {
-                            if (customTitle.isNotBlank()) {
-                                viewModel.addCustomEvaluation(customTitle)
-                                customTitle = ""
-                                showAddCustom = false
-                            }
-                        }) {
-                            Icon(Icons.Default.Check, contentDescription = "حفظ")
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                customEvals.forEach { custom ->
-                    OutlinedButton(
-                        onClick = {
-                            viewModel.addEvaluation(student.id, custom.title)
-                            Toast.makeText(context, "تم تسجيل: ${custom.title}", Toast.LENGTH_SHORT).show()
-                            onDismiss()
-                        },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
-                    ) {
-                        Text(custom.title)
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("إغلاق") }
-        }
-    )
-}
-
-@Composable
-fun AlertsScreen(viewModel: MainViewModel) {
-    val alerts by viewModel.pendingAlerts.collectAsState()
-    val context = LocalContext.current
-
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("حالات الغياب والتأخير التي تتطلب متابعة", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        Spacer(modifier = Modifier.height(12.dp))
-
-        if (alerts.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("لا توجد حالات غياب أو تأخير تتطلب المتابعة")
-            }
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(alerts) { alert ->
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text("رقم الطالب: ${alert.studentId} - الحالة: ${alert.status}", fontWeight = FontWeight.Bold)
-                            Text("التاريخ: ${alert.date}", fontSize = 12.sp, color = Color.Gray)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("توثيق العذر:", fontSize = 12.sp)
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                listOf("اتصال", "واتساب", "SMS", "ورقة عذر").forEach { reason ->
-                                    OutlinedButton(onClick = {
-                                        viewModel.resolveAlert(alert.id, reason, "تم التواصل مع ولي الأمر")
-                                        Toast.makeText(context, "تم توثيق الحالة عبر $reason", Toast.LENGTH_SHORT).show()
-                                    }) {
-                                        Text(reason, fontSize = 10.sp)
-                                    }
+                    items(students) { student ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = student.name,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                Text(
+                                    text = "الحلقة/الشعبة: ${student.section}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                if (student.parentPhone.isNotBlank()) {
+                                    Text(
+                                        text = "هاتف ولي الأمر: ${student.parentPhone}",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
                                 }
                             }
                         }
@@ -544,38 +138,52 @@ fun AlertsScreen(viewModel: MainViewModel) {
                 }
             }
         }
-    }
-}
 
-@Composable
-fun AddStudentDialog(onDismiss: () -> Unit, onConfirm: (String, String, String) -> Unit) {
-    var name by remember { mutableStateOf("") }
-    var section by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("إضافة طالب جديد") },
-        text = {
-            Column {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("اسم الطالب") })
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(value = section, onValueChange = { section = it }, label = { Text("الحلقة / الشعبة") })
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("هاتف ولي الأمر") })
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                if (name.isNotBlank() && section.isNotBlank()) {
-                    onConfirm(name, section, phone)
+        if (showAddDialog) {
+            AlertDialog(
+                onDismissRequest = { showAddDialog = false },
+                title = { Text("إضافة طالب جديد") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = studentNameInput,
+                            onValueChange = { studentNameInput = it },
+                            label = { Text("اسم الطالب") },
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = studentSectionInput,
+                            onValueChange = { studentSectionInput = it },
+                            label = { Text("الشعبة / الحلقة") },
+                            singleLine = true
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (studentNameInput.isNotBlank()) {
+                                viewModel.addStudent(
+                                    Student(
+                                        name = studentNameInput.trim(),
+                                        section = studentSectionInput.trim().ifEmpty { "عام" }
+                                    )
+                                )
+                                studentNameInput = ""
+                                studentSectionInput = ""
+                                showAddDialog = false
+                            }
+                        }
+                    ) {
+                        Text("حفظ")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAddDialog = false }) {
+                        Text("إلغاء")
+                    }
                 }
-            }) {
-                Text("حفظ")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("إلغاء") }
+            )
         }
-    )
+    }
 }
