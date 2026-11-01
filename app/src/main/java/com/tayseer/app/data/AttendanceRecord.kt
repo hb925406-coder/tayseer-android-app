@@ -13,9 +13,9 @@ enum class AttendanceStatus(val arabicLabel: String) {
     TRUANT("هارب");
 
     companion object {
-        fun fromName(name: String): AttendanceStatus {
+        fun fromName(name: String?): AttendanceStatus {
             return try {
-                valueOf(name)
+                if (name != null) valueOf(name) else PRESENT
             } catch (e: Exception) {
                 PRESENT
             }
@@ -32,11 +32,8 @@ enum class AttendanceStatus(val arabicLabel: String) {
 data class AttendanceRecord(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val studentId: Long,
-    val date: String,
-    val status: String = AttendanceStatus.PRESENT.name,
+    val studentId: Long = 0,
+    val date: String = "",
+    val status: String = "PRESENT",
     val reasonNote: String = ""
-) {
-    val statusEnum: AttendanceStatus
-        get() = AttendanceStatus.fromName(status)
-}
+)
