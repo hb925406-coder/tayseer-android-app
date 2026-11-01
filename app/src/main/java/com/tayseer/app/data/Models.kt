@@ -10,6 +10,15 @@ enum class Role {
     PARENT
 }
 
+enum class AttendanceStatus(val arabicTitle: String) {
+    PRESENT("حاضر"),
+    ABSENT("غائب"),
+    EXCUSED("مستأذن"),
+    LATE("متأخر"),
+    ABSENT_WITH_EXCUSE("غائب بعذر"),
+    ESCAPED("هارب")
+}
+
 @Entity(tableName = "users")
 data class User(
     @PrimaryKey(autoGenerate = true)
