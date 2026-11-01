@@ -99,7 +99,7 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
                     AttendanceRecord(
                         studentId = student.id,
                         date = date,
-                        status = AttendanceStatus.PRESENT
+                        status = AttendanceStatus.PRESENT.name
                     )
                 }
                 attendanceDao.recordBulkAttendance(records)
@@ -113,7 +113,7 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
             val record = AttendanceRecord(
                 studentId = studentId,
                 date = _currentDate.value,
-                status = status,
+                status = status.name,
                 reasonNote = note
             )
             attendanceDao.recordAttendance(record)
