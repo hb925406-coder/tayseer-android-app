@@ -85,7 +85,7 @@ data class AttendanceRecord(
     val date: String = "",
 
     @ColumnInfo(name = "status")
-    val status: String = "PRESENT",
+    val status: String = "حاضر",
 
     @ColumnInfo(name = "reasonNote")
     val reasonNote: String = "",
@@ -100,10 +100,14 @@ data class AttendanceRecord(
     val isResolved: Boolean = false
 ) {
     val statusEnum: AttendanceStatus
-        get() = try {
-            AttendanceStatus.valueOf(status)
-        } catch (e: Exception) {
-            AttendanceStatus.PRESENT
+        get() = when (status) {
+            "حاضر", "PRESENT" -> AttendanceStatus.PRESENT
+            "غائب", "ABSENT" -> AttendanceStatus.ABSENT
+            "مستأذن", "EXCUSED" -> AttendanceStatus.EXCUSED
+            "متأخر", "LATE" -> AttendanceStatus.LATE
+            "غائب بعذر", "ABSENT_WITH_EXCUSE" -> AttendanceStatus.ABSENT_WITH_EXCUSE
+            "هارب", "ESCAPED" -> AttendanceStatus.ESCAPED
+            else -> AttendanceStatus.PRESENT
         }
 }
 
