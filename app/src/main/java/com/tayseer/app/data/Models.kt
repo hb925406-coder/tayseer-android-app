@@ -10,13 +10,16 @@ enum class Role {
     PARENT
 }
 
-enum class AttendanceStatus(val arabicTitle: String) {
+enum class AttendanceStatus(val arabicLabel: String) {
     PRESENT("حاضر"),
     ABSENT("غائب"),
     EXCUSED("مستأذن"),
     LATE("متأخر"),
     ABSENT_WITH_EXCUSE("غائب بعذر"),
-    ESCAPED("هارب")
+    TRUANT("هارب");
+
+    val arabicTitle: String
+        get() = arabicLabel
 }
 
 @Entity(tableName = "users")
@@ -32,7 +35,7 @@ data class User(
     val passwordHash: String = "",
 
     @ColumnInfo(name = "role")
-    val role: Role = Role.ADMIN,
+    val role: String = "ADMIN",
 
     @ColumnInfo(name = "assignedSection")
     val assignedSection: String = "",
@@ -42,7 +45,14 @@ data class User(
 
     @ColumnInfo(name = "studentId")
     val studentId: Long? = null
-)
+) {
+    val roleEnum: Role
+        get() = try {
+            Role.valueOf(role)
+        } catch (e: Exception) {
+            Role.ADMIN
+        }
+}
 
 @Entity(tableName = "students")
 data class Student(
@@ -106,7 +116,7 @@ data class AttendanceRecord(
             "مستأذن", "EXCUSED" -> AttendanceStatus.EXCUSED
             "متأخر", "LATE" -> AttendanceStatus.LATE
             "غائب بعذر", "ABSENT_WITH_EXCUSE" -> AttendanceStatus.ABSENT_WITH_EXCUSE
-            "هارب", "ESCAPED" -> AttendanceStatus.ESCAPED
+            "هارب", "TRUANT", "ESCAPED" -> AttendanceStatus.TRUANT
             else -> AttendanceStatus.PRESENT
         }
 }
