@@ -4,6 +4,7 @@ import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
 @Dao
+@TypeConverters(Converters::class)
 interface AttendanceDao {
 
     @Query("SELECT * FROM attendance_records WHERE date = :date")
