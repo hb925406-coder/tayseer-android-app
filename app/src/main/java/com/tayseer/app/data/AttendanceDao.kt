@@ -10,13 +10,13 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface AttendanceDao {
-    @Query("SELECT * FROM attendance_records WHERE date = :date")
+    @Query("SELECT * FROM attendance WHERE date = :date")
     fun getAttendanceByDate(date: String): Flow<List<AttendanceRecord>>
 
-    @Query("SELECT * FROM attendance_records WHERE studentId = :studentId ORDER BY date DESC")
+    @Query("SELECT * FROM attendance WHERE studentId = :studentId ORDER BY date DESC")
     fun getAttendanceForStudent(studentId: Long): Flow<List<AttendanceRecord>>
 
-    @Query("SELECT * FROM attendance_records WHERE studentId = :studentId AND date = :date LIMIT 1")
+    @Query("SELECT * FROM attendance WHERE studentId = :studentId AND date = :date LIMIT 1")
     suspend fun getRecord(studentId: Long, date: String): AttendanceRecord?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -31,6 +31,6 @@ interface AttendanceDao {
     @Delete
     suspend fun deleteRecord(record: AttendanceRecord)
 
-    @Query("SELECT COUNT(*) FROM attendance_records WHERE studentId = :studentId AND status = :status")
+    @Query("SELECT COUNT(*) FROM attendance WHERE studentId = :studentId AND status = :status")
     suspend fun countStatusForStudent(studentId: Long, status: String): Int
 }
