@@ -8,6 +8,8 @@ import com.tayseer.app.data.AppDatabase
 import com.tayseer.app.data.AttendanceRecord
 import com.tayseer.app.data.AttendanceStatus
 import com.tayseer.app.data.CsvImporter
+import com.tayseer.app.data.CustomEvaluation
+import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Student
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,6 +27,7 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
     private val database = AppDatabase.getDatabase(application)
     private val studentDao = database.studentDao()
     private val attendanceDao = database.attendanceDao()
+    private val appDao = database.appDao()
 
     private val _students = MutableStateFlow<List<Student>>(emptyList())
     val students: StateFlow<List<Student>> = _students.asStateFlow()
@@ -35,6 +38,9 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
     val todayAttendance: StateFlow<List<AttendanceRecord>> = _currentDate.flatMapLatest { date ->
         attendanceDao.getAttendanceByDate(date)
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    val customEvaluations: StateFlow<List<CustomEvaluation>> = appDao.getAllCustomEvaluations()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     private val _importStatusMessage = MutableStateFlow<String?>(null)
     val importStatusMessage: StateFlow<String?> = _importStatusMessage.asStateFlow()
@@ -119,6 +125,40 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
             attendanceDao.recordAttendance(record)
         }
     }
+
+    fun addEvaluation(studentId: Long, evaluationType: String, note: String = "") {
+        viewModelScope.launch {
+            val record = EvaluationRecord(
+                studentId = studentId,
+                date = _currentDate.value,
+                evaluationType = evaluationType,
+                note = note
+            )
+            appDao.insertEvaluation(record)
+            _importStatusMessage.value = "تم تسجيل تقييم ($evaluationType) بنجاح"
+        }
+    }
+
+    fun addCustomEvaluation(title: String, isPositive: Boolean) {
+        viewModelScope.launch {
+            if (title.isNotBlank()) {
+                appDao.insertCustomEvaluation(
+                    CustomEvaluation(
+                        title = title.trim(),
+                        isPositive = isPositive
+                    )
+                )
+            }
+        }
+    }
+
+    fun deleteCustomEvaluation(evaluation: CustomEvaluation) {
+        viewModelScope.launch {
+            appDao.deleteCustomEvaluation(evaluation)
+        }
+    }
+
+    fun getStudentEvaluations(studentId: Long) = appDao.getEvaluationsForStudent(studentId)
 
     fun clearStatusMessage() {
         _importStatusMessage.value = null
