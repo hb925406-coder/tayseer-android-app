@@ -1,43 +1,34 @@
 package com.tayseer.app.data
 
 import androidx.room.Dao
-import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface AttendanceDao {
-    @Query("SELECT * FROM attendance WHERE date = :date")
+    @Query("SELECT * FROM attendance_records WHERE date = :date")
     fun getAttendanceByDate(date: String): Flow<List<AttendanceRecord>>
 
-    @Query("SELECT * FROM attendance WHERE studentId = :studentId ORDER BY date DESC")
-    fun getAttendanceForStudent(studentId: Long): Flow<List<AttendanceRecord>>
+    @Query("SELECT * FROM attendance_records WHERE date = :date")
+    suspend fun getAttendanceListByDateSync(date: String): List<AttendanceRecord>
 
-    @Query("SELECT * FROM attendance WHERE studentId = :studentId AND date = :date LIMIT 1")
-    suspend fun getRecord(studentId: Long, date: String): AttendanceRecord?
+    @Query("SELECT * FROM attendance_records WHERE studentId = :studentId AND date = :date LIMIT 1")
+    suspend fun getRecordForStudent(studentId: Long, date: String): AttendanceRecord?
+
+    @Query("SELECT * FROM attendance_records WHERE studentId = :studentId ORDER BY date DESC")
+    suspend fun getAttendanceForStudentSync(studentId: Long): List<AttendanceRecord>
+
+    @Query("SELECT * FROM attendance_records WHERE (status = 'ABSENT' OR status = 'LATE' OR status = 'TRUANT') AND isFollowedUp = 0 ORDER BY date DESC")
+    fun getPendingAlerts(): Flow<List<AttendanceRecord>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun recordAttendance(record: AttendanceRecord): Long
+    suspend fun insertAttendance(record: AttendanceRecord)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun recordBulkAttendance(records: List<AttendanceRecord>): List<Long>
+    suspend fun insertAttendanceList(records: List<AttendanceRecord>)
 
-    @Update
-    suspend fun updateAttendance(record: AttendanceRecord)
-
-    @Delete
-    suspend fun deleteRecord(record: AttendanceRecord)
-
-    @Query("SELECT COUNT(*) FROM attendance WHERE studentId = :studentId AND status = :status")
-    suspend fun countStatusForStudent(studentId: Long, status: String): Int
-
-    // استعلامات قسم التنبيهات والمتابعة المطابقة لجدول attendance
-    @Query("SELECT * FROM attendance WHERE (status IN ('غائب', 'ABSENT', 'متأخر', 'LATE', 'هارب', 'TRUANT', 'ESCAPED')) AND isResolved = 0 ORDER BY date DESC")
-    fun getPendingFollowUps(): Flow<List<AttendanceRecord>>
-
-    @Query("UPDATE attendance SET isResolved = 1, excuseType = :method, excuseReason = :note WHERE id = :recordId")
+    @Query("UPDATE attendance_records SET isFollowedUp = 1, followUpMethod = :method, followUpNote = :note WHERE id = :recordId")
     suspend fun resolveFollowUp(recordId: Long, method: String, note: String)
 }
