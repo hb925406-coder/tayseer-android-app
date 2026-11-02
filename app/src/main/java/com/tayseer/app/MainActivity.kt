@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,9 +23,11 @@ import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PictureAsPdf
@@ -59,12 +62,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            TayseerTheme {
+            val systemInDark = isSystemInDarkTheme()
+            var isDarkMode by remember { mutableStateOf(systemInDark) }
+
+            TayseerTheme(darkTheme = isDarkMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    TayseerMainApp(viewModel = viewModel)
+                    TayseerMainApp(
+                        viewModel = viewModel,
+                        isDarkMode = isDarkMode,
+                        onToggleDarkMode = { isDarkMode = !isDarkMode }
+                    )
                 }
             }
         }
@@ -73,7 +83,11 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TayseerMainApp(viewModel: StudentViewModel) {
+fun TayseerMainApp(
+    viewModel: StudentViewModel,
+    isDarkMode: Boolean,
+    onToggleDarkMode: () -> Unit
+) {
     val context = LocalContext.current
     var selectedTab by remember { mutableStateOf(0) }
     val statusMessage by viewModel.importStatusMessage.collectAsState()
@@ -128,7 +142,11 @@ fun TayseerMainApp(viewModel: StudentViewModel) {
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (selectedTab) {
-                0 -> AttendanceScreen(viewModel = viewModel)
+                0 -> AttendanceScreen(
+                    viewModel = viewModel,
+                    isDarkMode = isDarkMode,
+                    onToggleDarkMode = onToggleDarkMode
+                )
                 1 -> {
                     if (currentRole != UserRole.PARENT) {
                         FollowUpScreen(
@@ -139,10 +157,18 @@ fun TayseerMainApp(viewModel: StudentViewModel) {
                             }
                         )
                     } else {
-                        AttendanceScreen(viewModel = viewModel)
+                        AttendanceScreen(
+                            viewModel = viewModel,
+                            isDarkMode = isDarkMode,
+                            onToggleDarkMode = onToggleDarkMode
+                        )
                     }
                 }
-                2 -> EvaluationsScreen(viewModel = viewModel)
+                2 -> EvaluationsScreen(
+                    viewModel = viewModel,
+                    isDarkMode = isDarkMode,
+                    onToggleDarkMode = onToggleDarkMode
+                )
             }
         }
     }
@@ -150,7 +176,11 @@ fun TayseerMainApp(viewModel: StudentViewModel) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AttendanceScreen(viewModel: StudentViewModel) {
+fun AttendanceScreen(
+    viewModel: StudentViewModel,
+    isDarkMode: Boolean,
+    onToggleDarkMode: () -> Unit
+) {
     val context = LocalContext.current
     val currentRole by viewModel.currentUserRole.collectAsState()
     val filteredStudents by viewModel.filteredStudents.collectAsState()
@@ -200,10 +230,20 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                 title = {
                     Column {
                         Text("تيسير - متابعة الحضور", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text("الوضع الحالي: ${currentRole.title}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        Text("الوضع: ${currentRole.title}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     }
                 },
                 actions = {
+                    // زر التبديل المباشر بين الوضع الليلي والوضع الفاتح
+                    IconButton(onClick = onToggleDarkMode) {
+                        Icon(
+                            imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            contentDescription = if (isDarkMode) "تفعيل الوضع الفاتح" else "تفعيل الوضع الليلي",
+                            tint = if (isDarkMode) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    // زر اختيار وتبديل الدور
                     IconButton(onClick = { showRoleDialog = true }) {
                         Icon(Icons.Default.AccountCircle, contentDescription = "تبديل الدور")
                     }
@@ -580,7 +620,11 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EvaluationsScreen(viewModel: StudentViewModel) {
+fun EvaluationsScreen(
+    viewModel: StudentViewModel,
+    isDarkMode: Boolean,
+    onToggleDarkMode: () -> Unit
+) {
     val context = LocalContext.current
     val currentRole by viewModel.currentUserRole.collectAsState()
     val filteredStudents by viewModel.filteredStudents.collectAsState()
@@ -599,6 +643,14 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
             TopAppBar(
                 title = { Text("تيسير - التقييم والسلوك") },
                 actions = {
+                    IconButton(onClick = onToggleDarkMode) {
+                        Icon(
+                            imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            contentDescription = if (isDarkMode) "تفعيل الوضع الفاتح" else "تفعيل الوضع الليلي",
+                            tint = if (isDarkMode) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
                     if (currentRole == UserRole.ADMIN) {
                         IconButton(onClick = { showCustomEvalManager = true }) {
                             Icon(Icons.Default.Settings, contentDescription = "إدارة التقييمات المخصصة")
