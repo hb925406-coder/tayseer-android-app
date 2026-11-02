@@ -19,16 +19,13 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Grant Execute Permission for Gradlew
-      run: chmod +x gradlew
-
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
         gradle-version: '8.5'
 
-    - name: Build APK with Gradle
-      run: ./gradlew assembleRelease || ./gradlew assembleDebug --stacktrace
+    - name: Build APK using Global Gradle
+      run: gradle assembleRelease || gradle assembleDebug --stacktrace
 
     - name: Sign APK with Fixed Tayseer Key
       run: |
