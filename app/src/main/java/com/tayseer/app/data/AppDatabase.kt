@@ -56,7 +56,41 @@ data class CustomEvaluation(
     val isPositive: Boolean = true
 )
 
-// DAOs
+// واجهة التعامل مع جدول الطلاب
+@Dao
+interface StudentDao {
+    @Query("SELECT * FROM students WHERE isArchived = 0 ORDER BY name ASC")
+    fun getAllActiveStudents(): Flow<List<Student>>
+
+    @Query("SELECT * FROM students ORDER BY name ASC")
+    fun getAllStudents(): Flow<List<Student>>
+
+    @Query("SELECT * FROM students WHERE academicYear = :year AND isArchived = 0 ORDER BY name ASC")
+    fun getStudentsByYear(year: String): Flow<List<Student>>
+
+    @Query("SELECT DISTINCT section FROM students WHERE isArchived = 0 ORDER BY section ASC")
+    fun getActiveSections(): Flow<List<String>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertStudent(student: Student): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertStudents(students: List<Student>)
+
+    @Update
+    suspend fun updateStudent(student: Student)
+
+    @Delete
+    suspend fun deleteStudent(student: Student)
+
+    @Query("UPDATE students SET isArchived = 1 WHERE id = :studentId")
+    suspend fun archiveStudent(studentId: Long)
+
+    @Query("UPDATE students SET isArchived = 1 WHERE academicYear = :currentYear")
+    suspend fun archiveCurrentYearStudents(currentYear: String)
+}
+
+// واجهة التعامل مع جدول الحضور
 @Dao
 interface AttendanceDao {
     @Query("SELECT * FROM attendance_records WHERE date = :date")
@@ -84,6 +118,7 @@ interface AttendanceDao {
     suspend fun resolveFollowUp(recordId: Long, method: String, note: String)
 }
 
+// واجهة التعامل مع جدول التقييمات
 @Dao
 interface EvaluationDao {
     @Query("SELECT * FROM evaluations WHERE studentId = :studentId ORDER BY date DESC")
