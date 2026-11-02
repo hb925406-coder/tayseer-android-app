@@ -1,7 +1,6 @@
 package com.tayseer.app.data
 
 import androidx.room.Entity
-import androidx.room.Ignore
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "attendance_records")
@@ -15,13 +14,12 @@ data class AttendanceRecord(
     val isFollowedUp: Boolean = false,
     val followUpMethod: String? = null,
     val followUpNote: String? = null
-) {
-    @delegate:Ignore
-    val statusEnum: AttendanceStatus by lazy {
-        try {
-            AttendanceStatus.valueOf(status)
-        } catch (e: Exception) {
-            AttendanceStatus.PRESENT
-        }
+)
+
+fun AttendanceRecord.getStatusEnum(): AttendanceStatus {
+    return try {
+        AttendanceStatus.valueOf(status)
+    } catch (e: Exception) {
+        AttendanceStatus.PRESENT
     }
 }
