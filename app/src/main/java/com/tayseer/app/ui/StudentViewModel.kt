@@ -14,6 +14,7 @@ import com.tayseer.app.data.CsvImporter
 import com.tayseer.app.data.CustomEvaluation
 import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Student
+import com.tayseer.app.util.BackupManager
 import com.tayseer.app.util.PdfReportGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -261,6 +262,49 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
                 context.startActivity(chooser)
             } catch (e: Exception) {
                 _importStatusMessage.value = "تعذر إنشاء خلاصة الطالب: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    // تصدير نسخة احتياطية من قاعدة البيانات ومشاركتها
+    fun backupDatabase(context: Context) {
+        viewModelScope.launch {
+            val result = BackupManager.createBackupFile(context)
+            result.onSuccess { file ->
+                try {
+                    val fileUri: Uri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        file
+                    )
+                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/octet-stream"
+                        putExtra(Intent.EXTRA_STREAM, fileUri)
+                        putExtra(Intent.EXTRA_SUBJECT, "نسخة احتياطية - تطبيق تيسير")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    val chooser = Intent.createChooser(shareIntent, "حفظ أو إرسال النسخة الاحتياطية عبر:")
+                    chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(chooser)
+                    _importStatusMessage.value = "تم تجهيز النسخة الاحتياطية بنجاح"
+                } catch (e: Exception) {
+                    _importStatusMessage.value = "تعذر مشاركة النسخة الاحتياطية: ${e.localizedMessage}"
+                }
+            }.onFailure { error ->
+                _importStatusMessage.value = "فشل إنشاء النسخة الاحتياطية: ${error.localizedMessage}"
+            }
+        }
+    }
+
+    // استعادة قاعدة البيانات من ملف نسخة احتياطية
+    fun restoreDatabase(context: Context, fileUri: Uri) {
+        viewModelScope.launch {
+            val result = BackupManager.restoreDatabaseFromUri(context, fileUri)
+            result.onSuccess {
+                _importStatusMessage.value = "تمت استعادة البيانات بنجاح! يُفضل إعادة تشغيل التطبيق"
+                loadStudents()
+            }.onFailure { error ->
+                _importStatusMessage.value = "فشل استعادة البيانات: ${error.localizedMessage}"
             }
         }
     }
