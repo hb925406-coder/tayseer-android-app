@@ -12,6 +12,20 @@ import java.io.FileOutputStream
 
 object PdfReportGenerator {
 
+    // دالة مساعدة لتحويل مسمى الحالة الإنجليزي إلى الاسم العربي الرسمي لتطبيق تيسير
+    private fun getArabicStatusLabel(statusRaw: String?): String {
+        return when (statusRaw) {
+            "PRESENT", "حاضر" -> "حاضر"
+            "ABSENT", "غائب" -> "غائب"
+            "EXCUSED", "مستأذن" -> "مستأذن"
+            "LATE", "متأخر" -> "متأخر"
+            "ABSENT_WITH_EXCUSE", "غائب بعذر" -> "غائب بعذر"
+            "TRUANT", "هارب" -> "هارب"
+            null, "" -> "لم يُسجل"
+            else -> statusRaw
+        }
+    }
+
     // تقرير كشف الحضور اليومي
     fun generateDailyReportPdf(
         context: Context,
@@ -58,7 +72,7 @@ object PdfReportGenerator {
 
         canvas.drawText("م", 540f, 175f, headerPaint)
         canvas.drawText("اسم الطالب", 480f, 175f, headerPaint)
-        canvas.drawText("الحالة", 200f, 175f, headerPaint)
+        canvas.drawText("الحالة", 220f, 175f, headerPaint)
         canvas.drawText("الحلقة", 100f, 175f, headerPaint)
 
         canvas.drawLine(40f, 185f, 555f, 185f, linePaint)
@@ -67,11 +81,11 @@ object PdfReportGenerator {
         students.forEachIndexed { index, student ->
             if (yPosition < 800f) {
                 val record = records.find { it.studentId == student.id }
-                val status = record?.status ?: "لم يُسجل"
+                val statusText = getArabicStatusLabel(record?.status)
 
                 canvas.drawText("${index + 1}", 540f, yPosition, bodyPaint)
                 canvas.drawText(student.name, 480f, yPosition, bodyPaint)
-                canvas.drawText(status, 200f, yPosition, bodyPaint)
+                canvas.drawText(statusText, 220f, yPosition, bodyPaint)
                 canvas.drawText(student.section, 100f, yPosition, bodyPaint)
 
                 canvas.drawLine(40f, yPosition + 10f, 555f, yPosition + 10f, linePaint)
@@ -130,22 +144,37 @@ object PdfReportGenerator {
         canvas.drawText("تطبيق تيسير - تقرير خلاصة الطالب", 297f, 50f, titlePaint)
         canvas.drawText("اسم الطالب: ${student.name}", 540f, 90f, headerPaint)
         canvas.drawText("الحلقة / الصف: ${student.section}", 540f, 115f, headerPaint)
-        canvas.drawText("هاتف ولي الأمر: ${student.parentPhone}", 540f, 140f, headerPaint)
+        canvas.drawText("هاتف ولي الأمر: ${student.parentPhone.ifEmpty { "غير مسجل" }}", 540f, 140f, headerPaint)
 
         // إحصائيات الحضور
-        val presentCount = attendanceList.count { it.status == "حاضر" }
-        val absentCount = attendanceList.count { it.status == "غائب" || it.status == "غائب بعذر" }
-        val lateCount = attendanceList.count { it.status == "متأخر" }
-        canvas.drawText("إحصائية الحضور: حاضر ($presentCount) | غياب ($absentCount) | تأخر ($lateCount)", 540f, 170f, headerPaint)
+        val presentCount = attendanceList.count { it.status == "PRESENT" || it.status == "حاضر" }
+        val absentCount = attendanceList.count { 
+            it.status == "ABSENT" || it.status == "غائب" || it.status == "ABSENT_WITH_EXCUSE" || it.status == "غائب بعذر" 
+        }
+        val lateCount = attendanceList.count { it.status == "LATE" || it.status == "متأخر" }
+        val excusedCount = attendanceList.count { it.status == "EXCUSED" || it.status == "مستأذن" }
+        val truantCount = attendanceList.count { it.status == "TRUANT" || it.status == "هارب" }
+
+        canvas.drawText(
+            "إحصائيات الحضور: حاضر ($presentCount) | غياب ($absentCount) | تأخر ($lateCount) | استئذان ($excusedCount) | هروب ($truantCount)",
+            540f,
+            170f,
+            headerPaint
+        )
 
         canvas.drawLine(40f, 190f, 555f, 190f, linePaint)
 
         // قسم سجلات التقييم الأحدث
         canvas.drawText("أحدث التقييمات والسلوك:", 540f, 215f, headerPaint)
         var yPos = 240f
-        evaluationList.take(6).forEach { eval ->
-            canvas.drawText("• التاريخ: ${eval.date}  -  التقييم: ${eval.evaluationType}", 520f, yPos, bodyPaint)
+        if (evaluationList.isEmpty()) {
+            canvas.drawText("• لا توجد تقييمات مسجلة بعد", 520f, yPos, bodyPaint)
             yPos += 24f
+        } else {
+            evaluationList.take(6).forEach { eval ->
+                canvas.drawText("• التاريخ: ${eval.date}  -  التقييم: ${eval.evaluationType}", 520f, yPos, bodyPaint)
+                yPos += 24f
+            }
         }
 
         yPos += 10f
@@ -155,9 +184,14 @@ object PdfReportGenerator {
         // قسم سجلات الحضور الأخيرة
         canvas.drawText("سجل الحضور الأخير:", 540f, yPos, headerPaint)
         yPos += 25f
-        attendanceList.take(8).forEach { att ->
-            canvas.drawText("• التاريخ: ${att.date}  -  الحالة: ${att.status}", 520f, yPos, bodyPaint)
-            yPos += 24f
+        if (attendanceList.isEmpty()) {
+            canvas.drawText("• لا توجد سجلات حضور مسجلة بعد", 520f, yPos, bodyPaint)
+        } else {
+            attendanceList.take(8).forEach { att ->
+                val statusText = getArabicStatusLabel(att.status)
+                canvas.drawText("• التاريخ: ${att.date}  -  الحالة: $statusText", 520f, yPos, bodyPaint)
+                yPos += 24f
+            }
         }
 
         pdfDocument.finishPage(page)
