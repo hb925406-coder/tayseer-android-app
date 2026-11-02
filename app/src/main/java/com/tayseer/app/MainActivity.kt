@@ -9,15 +9,18 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.History
@@ -25,6 +28,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
@@ -136,7 +140,10 @@ fun TayseerMainApp(viewModel: StudentViewModel) {
 @Composable
 fun AttendanceScreen(viewModel: StudentViewModel) {
     val context = LocalContext.current
-    val students by viewModel.students.collectAsState()
+    val filteredStudents by viewModel.filteredStudents.collectAsState()
+    val availableSections by viewModel.availableSections.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val selectedSection by viewModel.selectedSection.collectAsState()
     val todayAttendance by viewModel.todayAttendance.collectAsState()
     val currentDate by viewModel.currentDate.collectAsState()
 
@@ -234,8 +241,45 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
+            // شريط البحث
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { viewModel.onSearchQueryChange(it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                placeholder = { Text("بحث عن اسم الطالب...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "بحث") },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = "مسح")
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            // شرائح تصفية الحلقات والأقسام
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                availableSections.forEach { sectionName ->
+                    FilterChip(
+                        selected = (selectedSection == sectionName),
+                        onClick = { viewModel.onSectionSelect(sectionName) },
+                        label = { Text(sectionName) }
+                    )
+                }
+            }
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -297,7 +341,7 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                             style = MaterialTheme.typography.bodySmall
                         )
                         Text(
-                            text = "الإجمالي: ${students.size}",
+                            text = "المعروض: ${filteredStudents.size}",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -311,16 +355,21 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            if (students.isEmpty()) {
+            if (filteredStudents.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("لا يوجد طلاب مسجلون حالياً. استخدم زر + لإضافة طالب.")
+                    Text(
+                        if (searchQuery.isNotEmpty() || selectedSection != "الكل")
+                            "لا توجد نتائج مطابقة للبحث أو الحلقة المحددة."
+                        else
+                            "لا يوجد طلاب مسجلون حالياً. استخدم زر + لإضافة طالب."
+                    )
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(students) { student ->
+                    items(filteredStudents) { student ->
                         val record = attendanceMap[student.id]
                         val currentStatus = record?.statusEnum ?: AttendanceStatus.PRESENT
                         val statusColor = when (currentStatus) {
@@ -468,7 +517,7 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
 @Composable
 fun EvaluationsScreen(viewModel: StudentViewModel) {
     val context = LocalContext.current
-    val students by viewModel.students.collectAsState()
+    val filteredStudents by viewModel.filteredStudents.collectAsState()
     val customEvaluations by viewModel.customEvaluations.collectAsState()
 
     var selectedStudentForEval by remember { mutableStateOf<Student?>(null) }
@@ -503,7 +552,7 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
-            if (students.isEmpty()) {
+            if (filteredStudents.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -512,7 +561,7 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(students) { student ->
+                    items(filteredStudents) { student ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -706,7 +755,7 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
                 },
                 dismissButton = {
                     TextButton(onClick = { selectedStudentForHistory = null }) {
-                        Text("إغلاق")
+                        Text("إلغاء")
                     }
                 }
             )
