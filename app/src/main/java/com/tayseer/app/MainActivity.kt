@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
@@ -183,6 +185,7 @@ fun AttendanceScreen(
 ) {
     val context = LocalContext.current
     val currentRole by viewModel.currentUserRole.collectAsState()
+    val academicYear by viewModel.currentAcademicYear.collectAsState()
     val filteredStudents by viewModel.filteredStudents.collectAsState()
     val availableSections by viewModel.availableSections.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -193,6 +196,8 @@ fun AttendanceScreen(
     var showHijri by remember { mutableStateOf(true) }
     var showMenu by remember { mutableStateOf(false) }
     var showRoleDialog by remember { mutableStateOf(false) }
+    var showNewYearDialog by remember { mutableStateOf(false) }
+    var newYearInput by remember { mutableStateOf("") }
 
     var showAddDialog by remember { mutableStateOf(false) }
     var studentNameInput by remember { mutableStateOf("") }
@@ -230,11 +235,10 @@ fun AttendanceScreen(
                 title = {
                     Column {
                         Text("تيسير - متابعة الحضور", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text("الوضع: ${currentRole.title}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        Text("${currentRole.title} | سنة: $academicYear", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     }
                 },
                 actions = {
-                    // زر التبديل المباشر بين الوضع الليلي والوضع الفاتح
                     IconButton(onClick = onToggleDarkMode) {
                         Icon(
                             imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
@@ -243,7 +247,6 @@ fun AttendanceScreen(
                         )
                     }
 
-                    // زر اختيار وتبديل الدور
                     IconButton(onClick = { showRoleDialog = true }) {
                         Icon(Icons.Default.AccountCircle, contentDescription = "تبديل الدور")
                     }
@@ -277,6 +280,16 @@ fun AttendanceScreen(
                                 expanded = showMenu,
                                 onDismissRequest = { showMenu = false }
                             ) {
+                                DropdownMenuItem(
+                                    text = { Text("بدء سنة دراسية جديدة (أرشفة)") },
+                                    onClick = {
+                                        showMenu = false
+                                        showNewYearDialog = true
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.School, contentDescription = null)
+                                    }
+                                )
                                 DropdownMenuItem(
                                     text = { Text("إنشاء نسخة احتياطية") },
                                     onClick = {
@@ -436,7 +449,7 @@ fun AttendanceScreen(
                         if (searchQuery.isNotEmpty() || selectedSection != "الكل")
                             "لا توجد نتائج مطابقة للبحث أو الحلقة المحددة."
                         else
-                            "لا يوجد طلاب مسجلون حالياً."
+                            "لا يوجد طلاب مسجلون حالياً بالسنة الحالية."
                     )
                 }
             } else {
@@ -496,6 +509,46 @@ fun AttendanceScreen(
                     }
                 }
             }
+        }
+
+        if (showNewYearDialog) {
+            AlertDialog(
+                onDismissRequest = { showNewYearDialog = false },
+                title = { Text("بدء سنة دراسية جديدة") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "سيتم أرشفة جميع طلاب وسجلات السنة الحالية ($academicYear) بأمان دون حذف أي بيانات، لتبدأ قائمة جديدة خالية وجاهزة لاستيراد أو إضافة الطلاب الجدد.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        OutlinedTextField(
+                            value = newYearInput,
+                            onValueChange = { newYearInput = it },
+                            label = { Text("مسمى السنة الجديدة (مثال: 1448-1449)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (newYearInput.isNotBlank()) {
+                                viewModel.startNewAcademicYear(newYearInput.trim())
+                                newYearInput = ""
+                                showNewYearDialog = false
+                            }
+                        }
+                    ) {
+                        Text("بدء السنة وأرشفة الحالية")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showNewYearDialog = false }) {
+                        Text("إلغاء")
+                    }
+                }
+            )
         }
 
         if (showRoleDialog) {
@@ -596,7 +649,8 @@ fun AttendanceScreen(
                                 viewModel.addStudent(
                                     Student(
                                         name = studentNameInput.trim(),
-                                        section = studentSectionInput.trim().ifEmpty { "عام" }
+                                        section = studentSectionInput.trim().ifEmpty { "عام" },
+                                        academicYear = academicYear
                                     )
                                 )
                                 studentNameInput = ""
