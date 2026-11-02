@@ -1,29 +1,10 @@
 package com.tayseer.app.data
 
 import android.content.Context
-import androidx.room.Dao
-import androidx.room.Database
-import androidx.room.Delete
-import androidx.room.Entity
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.PrimaryKey
-import androidx.room.Query
-import androidx.room.Room
-import androidx.room.RoomDatabase
-import androidx.room.Update
+import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
-@Entity(tableName = "students")
-data class Student(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
-    val name: String,
-    val section: String = "عام",
-    val academicYear: String = "1447-1448",
-    val isArchived: Boolean = false
-)
-
+// 1. جدول سجلات الحضور
 @Entity(tableName = "attendance_records")
 data class AttendanceRecord(
     @PrimaryKey(autoGenerate = true)
@@ -44,6 +25,7 @@ data class AttendanceRecord(
         }
 }
 
+// 2. جدول سجلات التقييم
 @Entity(tableName = "evaluations")
 data class EvaluationRecord(
     @PrimaryKey(autoGenerate = true)
@@ -54,6 +36,7 @@ data class EvaluationRecord(
     val note: String? = null
 )
 
+// 3. جدول التقييمات المخصصة
 @Entity(tableName = "custom_evaluations")
 data class CustomEvaluation(
     @PrimaryKey(autoGenerate = true)
@@ -62,6 +45,7 @@ data class CustomEvaluation(
     val isPositive: Boolean = true
 )
 
+// واجهة التعامل مع جدول الطلاب
 @Dao
 interface StudentDao {
     @Query("SELECT * FROM students WHERE isArchived = 0 ORDER BY name ASC")
@@ -95,6 +79,7 @@ interface StudentDao {
     suspend fun archiveCurrentYearStudents(currentYear: String)
 }
 
+// واجهة التعامل مع جدول الحضور
 @Dao
 interface AttendanceDao {
     @Query("SELECT * FROM attendance_records WHERE date = :date")
@@ -122,6 +107,7 @@ interface AttendanceDao {
     suspend fun resolveFollowUp(recordId: Long, method: String, note: String)
 }
 
+// واجهة التعامل مع جدول التقييمات
 @Dao
 interface EvaluationDao {
     @Query("SELECT * FROM evaluations WHERE studentId = :studentId ORDER BY date DESC")
@@ -143,6 +129,7 @@ interface EvaluationDao {
     suspend fun deleteCustomEvaluation(evaluation: CustomEvaluation)
 }
 
+// تعريف قاعدة البيانات الكاملة
 @Database(
     entities = [
         Student::class,
