@@ -2,34 +2,26 @@ package com.tayseer.app.ui
 
 import android.app.Application
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
-import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tayseer.app.data.AppDatabase
 import com.tayseer.app.data.AttendanceRecord
 import com.tayseer.app.data.AttendanceStatus
-import com.tayseer.app.data.CsvImporter
 import com.tayseer.app.data.CustomEvaluation
 import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Student
-import com.tayseer.app.util.BackupManager
+import com.tayseer.app.util.DateUtils
 import com.tayseer.app.util.PdfReportGenerator
+import com.tayseer.app.util.StudentImporter
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.*
 
 enum class UserRole(val title: String) {
     ADMIN("الإدارة"),
@@ -39,329 +31,273 @@ enum class UserRole(val title: String) {
 
 class StudentViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val database = AppDatabase.getDatabase(application)
-    private val studentDao = database.studentDao()
-    private val attendanceDao = database.attendanceDao()
-    private val appDao = database.appDao()
+    private val db = AppDatabase.getDatabase(application)
+    private val studentDao = db.studentDao()
+    private val attendanceDao = db.attendanceDao()
+    private val evaluationDao = db.evaluationDao()
 
-    // دور المستخدم الحالي (افتراضياً: الإدارة)
     private val _currentUserRole = MutableStateFlow(UserRole.ADMIN)
     val currentUserRole: StateFlow<UserRole> = _currentUserRole.asStateFlow()
 
-    private val _students = MutableStateFlow<List<Student>>(emptyList())
-    val students: StateFlow<List<Student>> = _students.asStateFlow()
+    private val _currentAcademicYear = MutableStateFlow("1447-1448")
+    val currentAcademicYear: StateFlow<String> = _currentAcademicYear.asStateFlow()
 
-    // متغيرات البحث وتصفية الشعب والحلقات
+    private val _currentDate = MutableStateFlow(
+        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+    )
+    val currentDate: StateFlow<String> = _currentDate.asStateFlow()
+
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
     private val _selectedSection = MutableStateFlow("الكل")
     val selectedSection: StateFlow<String> = _selectedSection.asStateFlow()
 
-    // قائمة الطلاب المفلترة تلقائياً بحسب البحث والشعبة
-    val filteredStudents: StateFlow<List<Student>> = combine(
-        _students,
-        _searchQuery,
-        _selectedSection
-    ) { studentList, query, section ->
-        studentList.filter { student ->
-            val matchesQuery = query.isBlank() || student.name.contains(query.trim(), ignoreCase = true)
-            val matchesSection = section == "الكل" || student.section == section
-            matchesQuery && matchesSection
-        }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
-    // قائمة أسماء الحلقات/الشعب المتاحة
-    val availableSections: StateFlow<List<String>> = _students.flatMapLatest { list ->
-        val sections = listOf("الكل") + list.map { it.section }.distinct().filter { it.isNotBlank() }
-        MutableStateFlow(sections)
-    }.stateIn(viewModelScope, SharingStarted.Lazily, listOf("الكل"))
-
-    private val _currentDate = MutableStateFlow(getTodayDateString())
-    val currentDate: StateFlow<String> = _currentDate.asStateFlow()
-
-    val todayAttendance: StateFlow<List<AttendanceRecord>> = _currentDate.flatMapLatest { date ->
-        attendanceDao.getAttendanceByDate(date)
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
-    val pendingAlerts: StateFlow<List<AttendanceRecord>> = attendanceDao.getPendingFollowUps()
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
-    val customEvaluations: StateFlow<List<CustomEvaluation>> = appDao.getAllCustomEvaluations()
-        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
-
     private val _importStatusMessage = MutableStateFlow<String?>(null)
     val importStatusMessage: StateFlow<String?> = _importStatusMessage.asStateFlow()
 
-    init {
-        loadStudents()
-    }
+    // جلب الطلاب النشطين فقط تلقائياً
+    val students: StateFlow<List<Student>> = studentDao.getAllActiveStudents()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private fun getTodayDateString(): String {
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        return sdf.format(Date())
-    }
+    val availableSections: StateFlow<List<String>> = studentDao.getActiveSections()
+        .map { sections -> listOf("الكل") + sections }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), listOf("الكل"))
 
-    private fun loadStudents() {
-        viewModelScope.launch {
-            studentDao.getAllStudents().collect { list ->
-                _students.value = list
-            }
+    val filteredStudents: StateFlow<List<Student>> = combine(
+        students,
+        _searchQuery,
+        _selectedSection
+    ) { list, query, section ->
+        list.filter { student ->
+            val matchesQuery = student.name.contains(query, ignoreCase = true)
+            val matchesSection = if (section == "الكل") true else student.section == section
+            matchesQuery && matchesSection
         }
-    }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val todayAttendance: StateFlow<List<AttendanceRecord>> = _currentDate.flatMapLatest { date ->
+        attendanceDao.getAttendanceByDate(date)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val pendingAlerts: Flow<List<AttendanceRecord>> = attendanceDao.getPendingAlerts()
+
+    val customEvaluations: StateFlow<List<CustomEvaluation>> = evaluationDao.getAllCustomEvaluations()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun setUserRole(role: UserRole) {
         _currentUserRole.value = role
-        _importStatusMessage.value = "تم التبديل إلى وضع: ${role.title}"
     }
 
-    fun onSearchQueryChange(newQuery: String) {
-        _searchQuery.value = newQuery
+    fun onSearchQueryChange(query: String) {
+        _searchQuery.value = query
     }
 
     fun onSectionSelect(section: String) {
         _selectedSection.value = section
     }
 
+    fun clearStatusMessage() {
+        _importStatusMessage.value = null
+    }
+
     fun addStudent(student: Student) {
-        viewModelScope.launch {
-            studentDao.insertStudent(student)
+        viewModelScope.launch(Dispatchers.IO) {
+            val studentWithYear = if (student.academicYear.isBlank()) {
+                student.copy(academicYear = _currentAcademicYear.value)
+            } else student
+            studentDao.insertStudent(studentWithYear)
         }
     }
 
-    fun updateStudent(student: Student) {
-        viewModelScope.launch {
-            studentDao.updateStudent(student)
-        }
-    }
-
-    fun deleteStudent(student: Student) {
-        viewModelScope.launch {
-            studentDao.deleteStudent(student)
-        }
-    }
-
-    fun importStudentsFromCsv(uri: Uri) {
-        viewModelScope.launch {
-            try {
-                val parsedStudents = CsvImporter.parseCsv(getApplication(), uri)
-                if (parsedStudents.isNotEmpty()) {
-                    studentDao.insertStudents(parsedStudents)
-                    _importStatusMessage.value = "تم استيراد ${parsedStudents.size} طالب بنجاح"
-                } else {
-                    _importStatusMessage.value = "الملف فارغ أو تنسيقه غير متوافق"
-                }
-            } catch (e: Exception) {
-                _importStatusMessage.value = "حدث خطأ أثناء استيراد الملف"
-            }
+    fun updateStudentAttendance(studentId: Long, status: AttendanceStatus, note: String? = null) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val date = _currentDate.value
+            val existing = attendanceDao.getRecordForStudent(studentId, date)
+            val record = existing?.copy(
+                status = status.name,
+                reasonNote = note
+            ) ?: AttendanceRecord(
+                studentId = studentId,
+                date = date,
+                status = status.name,
+                reasonNote = note
+            )
+            attendanceDao.insertAttendance(record)
         }
     }
 
     fun setAllPresentForToday() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            val currentList = filteredStudents.value
             val date = _currentDate.value
-            val targetList = filteredStudents.value.ifEmpty { _students.value }
-            if (targetList.isNotEmpty()) {
-                val records = targetList.map { student ->
-                    AttendanceRecord(
+            val records = currentList.map { student ->
+                val existing = attendanceDao.getRecordForStudent(student.id, date)
+                existing?.copy(status = AttendanceStatus.PRESENT.name)
+                    ?: AttendanceRecord(
                         studentId = student.id,
                         date = date,
-                        status = AttendanceStatus.PRESENT.name,
-                        isResolved = true
+                        status = AttendanceStatus.PRESENT.name
                     )
-                }
-                attendanceDao.recordBulkAttendance(records)
-                _importStatusMessage.value = "تم تحضير (${targetList.size}) طالب كـ (حاضر)"
             }
+            attendanceDao.insertAttendanceList(records)
         }
     }
 
-    fun updateStudentAttendance(studentId: Long, status: AttendanceStatus, note: String = "") {
-        viewModelScope.launch {
-            val isResolvedState = (status == AttendanceStatus.PRESENT)
-            val record = AttendanceRecord(
-                studentId = studentId,
-                date = _currentDate.value,
-                status = status.name,
-                reasonNote = note,
-                isResolved = isResolvedState
-            )
-            attendanceDao.recordAttendance(record)
+    fun resolveAlert(recordId: Long, followUpMethod: String, note: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            attendanceDao.resolveFollowUp(recordId, followUpMethod, note)
         }
     }
 
-    fun resolveAlert(recordId: Long, method: String, note: String) {
-        viewModelScope.launch {
-            attendanceDao.resolveFollowUp(recordId, method, note)
-            _importStatusMessage.value = "تم توثيق العذر وإغلاق التنبيه بنجاح"
-        }
-    }
-
-    fun addEvaluation(studentId: Long, evaluationType: String, note: String = "") {
-        viewModelScope.launch {
-            val record = EvaluationRecord(
-                studentId = studentId,
-                date = _currentDate.value,
-                evaluationType = evaluationType,
-                note = note
-            )
-            appDao.insertEvaluation(record)
-            _importStatusMessage.value = "تم تسجيل تقييم ($evaluationType) بنجاح"
-        }
-    }
-
-    fun addCustomEvaluation(title: String, isPositive: Boolean) {
-        viewModelScope.launch {
-            if (title.isNotBlank()) {
-                appDao.insertCustomEvaluation(
-                    CustomEvaluation(
-                        title = title.trim(),
-                        isPositive = isPositive
-                    )
+    fun addEvaluation(studentId: Long, evaluationType: String, note: String? = null) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val date = _currentDate.value
+            evaluationDao.insertEvaluation(
+                EvaluationRecord(
+                    studentId = studentId,
+                    date = date,
+                    evaluationType = evaluationType,
+                    note = note
                 )
-            }
+            )
         }
     }
 
-    fun deleteCustomEvaluation(evaluation: CustomEvaluation) {
-        viewModelScope.launch {
-            appDao.deleteCustomEvaluation(evaluation)
+    fun getStudentEvaluations(studentId: Long): Flow<List<EvaluationRecord>> {
+        return evaluationDao.getEvaluationsForStudent(studentId)
+    }
+
+    fun addCustomEvaluation(title: String, isPositive: Boolean = true) {
+        viewModelScope.launch(Dispatchers.IO) {
+            evaluationDao.insertCustomEvaluation(
+                CustomEvaluation(title = title, isPositive = isPositive)
+            )
         }
     }
 
-    fun getStudentEvaluations(studentId: Long) = appDao.getEvaluationsForStudent(studentId)
+    fun deleteCustomEvaluation(customEvaluation: CustomEvaluation) {
+        viewModelScope.launch(Dispatchers.IO) {
+            evaluationDao.deleteCustomEvaluation(customEvaluation)
+        }
+    }
 
-    // تصدير ومشاركة تقرير كشف الحضور اليومي بصيغة PDF
-    fun exportAndShareDailyReport(context: Context, formattedDateDisplay: String) {
-        viewModelScope.launch {
+    // بدء سنة دراسية جديدة مع أرشفة طلاب وسجلات السنة السابقة بأمان
+    fun startNewAcademicYear(newYearName: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val oldYear = _currentAcademicYear.value
+            studentDao.archiveCurrentYearStudents(oldYear)
+            _currentAcademicYear.value = newYearName
+            _importStatusMessage.value = "تمت أرشفة سنة $oldYear وبدء السنة الدراسية الجديدة $newYearName بنجاح"
+        }
+    }
+
+    fun importStudentsFromCsv(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
-                val currentStudents = filteredStudents.value.ifEmpty { _students.value }
-                val currentRecords = todayAttendance.value
-                if (currentStudents.isEmpty()) {
-                    _importStatusMessage.value = "لا يوجد طلاب لإنشاء التقرير"
+                val context = getApplication<Application>()
+                val inputStream = context.contentResolver.openInputStream(uri)
+                if (inputStream == null) {
+                    _importStatusMessage.value = "تعذر فتح الملف المحدد"
                     return@launch
                 }
-
-                val sectionTitle = if (_selectedSection.value == "الكل") "جميع الحلقات" else _selectedSection.value
-
-                val pdfFile = withContext(Dispatchers.IO) {
-                    PdfReportGenerator.generateDailyReportPdf(
-                        context = context,
-                        students = currentStudents,
-                        records = currentRecords,
-                        dateString = formattedDateDisplay,
-                        section = sectionTitle
-                    )
+                val studentsList = StudentImporter.parseCsv(inputStream)
+                if (studentsList.isNotEmpty()) {
+                    val currentYear = _currentAcademicYear.value
+                    val formattedList = studentsList.map { it.copy(academicYear = currentYear) }
+                    studentDao.insertStudents(formattedList)
+                    _importStatusMessage.value = "تم استيراد ${formattedList.size} طالب بنجاح للسنة الدراسية $currentYear"
+                } else {
+                    _importStatusMessage.value = "الملف فارغ أو لا يحتوي على تنسيق متوافق"
                 }
-
-                val fileUri: Uri = FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    pdfFile
-                )
-
-                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                    type = "application/pdf"
-                    putExtra(Intent.EXTRA_STREAM, fileUri)
-                    putExtra(Intent.EXTRA_SUBJECT, "كشف حضور تيسير - $formattedDateDisplay")
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-
-                val chooser = Intent.createChooser(shareIntent, "مشاركة تقرير تيسير عبر:")
-                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(chooser)
             } catch (e: Exception) {
-                _importStatusMessage.value = "تعذر إنشاء ملف التقرير: ${e.localizedMessage}"
+                _importStatusMessage.value = "حدث خطأ أثناء الاستيراد: ${e.localizedMessage}"
             }
         }
     }
 
-    // تصدير ومشاركة خلاصة الطالب المفصلة بصيغة PDF
-    fun exportAndShareStudentSummary(context: Context, student: Student) {
-        viewModelScope.launch {
+    fun exportAndShareDailyReport(context: Context, displayDate: String) {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
-                val evals = withContext(Dispatchers.IO) {
-                    appDao.getEvaluationsForStudent(student.id).first()
-                }
-                val attendanceHistory = withContext(Dispatchers.IO) {
-                    attendanceDao.getAttendanceForStudent(student.id).first()
-                }
+                val currentList = filteredStudents.value
+                val date = _currentDate.value
+                val attendance = attendanceDao.getAttendanceListByDateSync(date)
+                val attendanceMap = attendance.associateBy { it.studentId }
 
-                val pdfFile = withContext(Dispatchers.IO) {
-                    PdfReportGenerator.generateStudentSummaryPdf(
-                        context = context,
-                        student = student,
-                        attendanceList = attendanceHistory,
-                        evaluationList = evals
-                    )
-                }
-
-                val fileUri: Uri = FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    pdfFile
+                val file = PdfReportGenerator.generateDailyAttendancePdf(
+                    context = context,
+                    dateString = displayDate,
+                    students = currentList,
+                    attendanceMap = attendanceMap
                 )
+                PdfReportGenerator.sharePdfFile(context, file)
+            } catch (e: Exception) {
+                _importStatusMessage.value = "تعذر إنشاء تقرير PDF: ${e.localizedMessage}"
+            }
+        }
+    }
 
-                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                    type = "application/pdf"
-                    putExtra(Intent.EXTRA_STREAM, fileUri)
-                    putExtra(Intent.EXTRA_SUBJECT, "تقرير خلاصة الطالب: ${student.name}")
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
+    fun exportAndShareStudentSummary(context: Context, student: Student) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val evaluations = evaluationDao.getEvaluationsForStudentSync(student.id)
+                val attendances = attendanceDao.getAttendanceForStudentSync(student.id)
 
-                val chooser = Intent.createChooser(shareIntent, "مشاركة خلاصة الطالب عبر:")
-                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(chooser)
+                val file = PdfReportGenerator.generateStudentSummaryPdf(
+                    context = context,
+                    student = student,
+                    evaluations = evaluations,
+                    attendances = attendances
+                )
+                PdfReportGenerator.sharePdfFile(context, file)
             } catch (e: Exception) {
                 _importStatusMessage.value = "تعذر إنشاء خلاصة الطالب: ${e.localizedMessage}"
             }
         }
     }
 
-    // تصدير نسخة احتياطية من قاعدة البيانات ومشاركتها
     fun backupDatabase(context: Context) {
-        viewModelScope.launch {
-            val result = BackupManager.createBackupFile(context)
-            result.onSuccess { file ->
-                try {
-                    val fileUri: Uri = FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        file
-                    )
-                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                        type = "application/octet-stream"
-                        putExtra(Intent.EXTRA_STREAM, fileUri)
-                        putExtra(Intent.EXTRA_SUBJECT, "نسخة احتياطية - تطبيق تيسير")
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    val chooser = Intent.createChooser(shareIntent, "حفظ أو إرسال النسخة الاحتياطية عبر:")
-                    chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(chooser)
-                    _importStatusMessage.value = "تم تجهيز النسخة الاحتياطية بنجاح"
-                } catch (e: Exception) {
-                    _importStatusMessage.value = "تعذر مشاركة النسخة الاحتياطية: ${e.localizedMessage}"
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val dbFile = context.getDatabasePath("tayseer_database")
+                if (!dbFile.exists()) {
+                    _importStatusMessage.value = "قاعدة البيانات فارغة أو غير موجودة بعد"
+                    return@launch
                 }
-            }.onFailure { error ->
-                _importStatusMessage.value = "فشل إنشاء النسخة الاحتياطية: ${error.localizedMessage}"
+                val backupDir = File(context.getExternalFilesDir(null), "TayseerBackups")
+                if (!backupDir.exists()) backupDir.mkdirs()
+
+                val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                val backupFile = File(backupDir, "tayseer_backup_$timeStamp.db")
+
+                FileInputStream(dbFile).use { input ->
+                    FileOutputStream(backupFile).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                _importStatusMessage.value = "تم إنشاء النسخة الاحتياطية بنجاح في مجلد التطبيق"
+            } catch (e: Exception) {
+                _importStatusMessage.value = "فشل إنشاء النسخة الاحتياطية: ${e.localizedMessage}"
             }
         }
     }
 
-    // استعادة قاعدة البيانات من ملف نسخة احتياطية
-    fun restoreDatabase(context: Context, fileUri: Uri) {
-        viewModelScope.launch {
-            val result = BackupManager.restoreDatabaseFromUri(context, fileUri)
-            result.onSuccess {
-                _importStatusMessage.value = "تمت استعادة البيانات بنجاح! يُفضل إعادة تشغيل التطبيق"
-                loadStudents()
-            }.onFailure { error ->
-                _importStatusMessage.value = "فشل استعادة البيانات: ${error.localizedMessage}"
+    fun restoreDatabase(context: Context, uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val dbFile = context.getDatabasePath("tayseer_database")
+                val inputStream = context.contentResolver.openInputStream(uri)
+                if (inputStream == null) {
+                    _importStatusMessage.value = "تعذر قراءة ملف النسخة الاحتياطية"
+                    return@launch
+                }
+                FileOutputStream(dbFile).use { output ->
+                    inputStream.copyTo(output)
+                }
+                _importStatusMessage.value = "تمت استعادة البيانات بنجاح! يرجى إعادة فتح التطبيق لتحديث السجلات"
+            } catch (e: Exception) {
+                _importStatusMessage.value = "فشل استعادة البيانات: ${e.localizedMessage}"
             }
         }
-    }
-
-    fun clearStatusMessage() {
-        _importStatusMessage.value = null
     }
 }
