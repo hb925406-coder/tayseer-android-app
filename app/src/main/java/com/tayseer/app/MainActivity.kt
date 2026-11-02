@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.*
@@ -426,6 +427,7 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EvaluationsScreen(viewModel: StudentViewModel) {
+    val context = LocalContext.current
     val students by viewModel.students.collectAsState()
     val customEvaluations by viewModel.customEvaluations.collectAsState()
 
@@ -582,7 +584,24 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
 
             AlertDialog(
                 onDismissRequest = { selectedStudentForHistory = null },
-                title = { Text("سجل تقييمات: ${student.name}") },
+                title = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("سجل الطالب: ${student.name}", modifier = Modifier.weight(1f))
+                        IconButton(onClick = {
+                            viewModel.exportAndShareStudentSummary(context, student)
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "مشاركة خلاصة الطالب PDF",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                },
                 text = {
                     Column(
                         modifier = Modifier
@@ -635,6 +654,17 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
                     }
                 },
                 confirmButton = {
+                    Button(
+                        onClick = {
+                            viewModel.exportAndShareStudentSummary(context, student)
+                        }
+                    ) {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("تصدير خلاصة الطالب PDF")
+                    }
+                },
+                dismissButton = {
                     TextButton(onClick = { selectedStudentForHistory = null }) {
                         Text("إغلاق")
                     }
