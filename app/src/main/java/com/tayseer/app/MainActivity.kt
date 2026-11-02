@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.UploadFile
@@ -130,6 +131,7 @@ fun TayseerMainApp(viewModel: StudentViewModel) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AttendanceScreen(viewModel: StudentViewModel) {
+    val context = LocalContext.current
     val students by viewModel.students.collectAsState()
     val todayAttendance by viewModel.todayAttendance.collectAsState()
     val currentDate by viewModel.currentDate.collectAsState()
@@ -158,6 +160,8 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
         it.statusEnum == AttendanceStatus.ABSENT || it.statusEnum == AttendanceStatus.ABSENT_WITH_EXCUSE 
     }
 
+    val displayDate = if (showHijri) DateUtils.formatToHijri(currentDate) else DateUtils.formatGregorianArabic(currentDate)
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -165,6 +169,11 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                 actions = {
                     IconButton(onClick = { viewModel.setAllPresentForToday() }) {
                         Icon(Icons.Default.DoneAll, contentDescription = "تحضير الكل كحاضر")
+                    }
+                    IconButton(onClick = {
+                        viewModel.exportAndShareDailyReport(context, displayDate)
+                    }) {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = "مشاركة تقرير PDF اليومي", tint = MaterialTheme.colorScheme.primary)
                     }
                     IconButton(onClick = {
                         filePickerLauncher.launch(arrayOf("text/*", "application/*"))
@@ -208,7 +217,7 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = if (showHijri) DateUtils.formatToHijri(currentDate) else DateUtils.formatGregorianArabic(currentDate),
+                                text = displayDate,
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.bodyMedium
                             )
