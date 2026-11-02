@@ -6,20 +6,12 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "attendance_records")
 data class AttendanceRecord(
     @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
-    val studentId: Long,
-    val date: String,
-    val status: String,
-    val reasonNote: String? = null,
-    val isFollowedUp: Boolean = false,
-    val followUpMethod: String? = null,
-    val followUpNote: String? = null
+    var id: Long = 0L,
+    var studentId: Long = 0L,
+    var date: String = "",
+    var status: String = "PRESENT",
+    var reasonNote: String? = null,
+    var isFollowedUp: Boolean = false,
+    var followUpMethod: String? = null,
+    var followUpNote: String? = null
 )
-
-fun AttendanceRecord.getStatusEnum(): AttendanceStatus {
-    return try {
-        AttendanceStatus.valueOf(status)
-    } catch (e: Exception) {
-        AttendanceStatus.PRESENT
-    }
-}
