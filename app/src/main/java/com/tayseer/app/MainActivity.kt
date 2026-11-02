@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.UploadFile
@@ -31,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import com.tayseer.app.data.AttendanceStatus
 import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Student
+import com.tayseer.app.ui.FollowUpScreen
 import com.tayseer.app.ui.StudentViewModel
 
 class MainActivity : ComponentActivity() {
@@ -59,6 +61,10 @@ fun TayseerMainApp(viewModel: StudentViewModel) {
     var selectedTab by remember { mutableStateOf(0) }
     val statusMessage by viewModel.importStatusMessage.collectAsState()
 
+    val pendingAlerts by viewModel.pendingAlerts.collectAsState(initial = emptyList())
+    val students by viewModel.students.collectAsState(initial = emptyList())
+    val studentsMap = remember(students) { students.associateBy { it.id } }
+
     LaunchedEffect(statusMessage) {
         statusMessage?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
@@ -78,6 +84,22 @@ fun TayseerMainApp(viewModel: StudentViewModel) {
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
+                    icon = {
+                        BadgedBox(
+                            badge = {
+                                if (pendingAlerts.isNotEmpty()) {
+                                    Badge { Text("${pendingAlerts.size}") }
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.Notifications, contentDescription = "التنبيهات والمتابعة")
+                        }
+                    },
+                    label = { Text("المتابعة") }
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
                     icon = { Icon(Icons.Default.Star, contentDescription = "التقييم والسلوك") },
                     label = { Text("التقييم والسلوك") }
                 )
@@ -85,10 +107,16 @@ fun TayseerMainApp(viewModel: StudentViewModel) {
         }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
-            if (selectedTab == 0) {
-                AttendanceScreen(viewModel = viewModel)
-            } else {
-                EvaluationsScreen(viewModel = viewModel)
+            when (selectedTab) {
+                0 -> AttendanceScreen(viewModel = viewModel)
+                1 -> FollowUpScreen(
+                    pendingRecords = pendingAlerts,
+                    studentsMap = studentsMap,
+                    onResolveFollowUp = { recordId, method, note ->
+                        viewModel.resolveAlert(recordId, method, note)
+                    }
+                )
+                2 -> EvaluationsScreen(viewModel = viewModel)
             }
         }
     }
@@ -204,8 +232,8 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                         ) {
                             Row(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
+                                .fillMaxWidth()
+                                .padding(12.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -417,7 +445,6 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
             }
         }
 
-        // نافذة تسجيل تقييم للطالب
         selectedStudentForEval?.let { student ->
             AlertDialog(
                 onDismissRequest = { selectedStudentForEval = null },
@@ -482,7 +509,6 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
             )
         }
 
-        // نافذة عرض سجل تقييمات الطالب السابق
         selectedStudentForHistory?.let { student ->
             val historyFlow = remember(student.id) { viewModel.getStudentEvaluations(student.id) }
             val historyList by historyFlow.collectAsState(initial = emptyList())
@@ -549,7 +575,6 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
             )
         }
 
-        // نافذة إدارة التقييمات المخصصة
         if (showCustomEvalManager) {
             AlertDialog(
                 onDismissRequest = { showCustomEvalManager = false },
