@@ -15,7 +15,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.*
@@ -68,13 +70,13 @@ fun TayseerMainApp(viewModel: StudentViewModel) {
                 NavigationBarItem(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    icon = { Icon(Icons.Default.CheckCircle, contentDescription = "الحضور") },
+                    icon = { Icon(Icons.Default.CheckCircle, contentDescription = "الحضور والغياب") },
                     label = { Text("الحضور والغياب") }
                 )
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    icon = { Icon(Icons.Default.Star, contentDescription = "التقييمات") },
+                    icon = { Icon(Icons.Default.Star, contentDescription = "التقييم والسلوك") },
                     label = { Text("التقييم والسلوك") }
                 )
             }
@@ -328,14 +330,25 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
 @Composable
 fun EvaluationsScreen(viewModel: StudentViewModel) {
     val students by viewModel.students.collectAsState()
+    val customEvaluations by viewModel.customEvaluations.collectAsState()
+
     var selectedStudentForEval by remember { mutableStateOf<Student?>(null) }
     var evalNoteInput by remember { mutableStateOf("") }
+    var showCustomEvalManager by remember { mutableStateOf(false) }
+    var newCustomEvalTitle by remember { mutableStateOf("") }
 
     val defaultEvals = listOf("حفظه", "لم يحفظ", "مميز", "مؤدب", "نسيان الكتب")
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("تيسير - التقييم والسلوك") })
+            TopAppBar(
+                title = { Text("تيسير - التقييم والسلوك") },
+                actions = {
+                    IconButton(onClick = { showCustomEvalManager = true }) {
+                        Icon(Icons.Default.Settings, contentDescription = "إدارة التقييمات المخصصة")
+                    }
+                }
+            )
         }
     ) { paddingValues ->
         Column(
@@ -392,13 +405,17 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
             }
         }
 
+        // نافذة تقييم الطالب
         selectedStudentForEval?.let { student ->
             AlertDialog(
                 onDismissRequest = { selectedStudentForEval = null },
                 title = { Text("تقييم الطالب: ${student.name}") },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("اختر التقييم السريع:")
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("التقييمات الأساسية:")
                         defaultEvals.forEach { evalType ->
                             OutlinedButton(
                                 onClick = {
@@ -414,6 +431,27 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
                                 Text(evalType)
                             }
                         }
+
+                        if (customEvaluations.isNotEmpty()) {
+                            Divider(modifier = Modifier.padding(vertical = 4.dp))
+                            Text("التقييمات المخصصة:")
+                            customEvaluations.forEach { customEval ->
+                                OutlinedButton(
+                                    onClick = {
+                                        viewModel.addEvaluation(
+                                            studentId = student.id,
+                                            evaluationType = customEval.title,
+                                            note = evalNoteInput.trim()
+                                        )
+                                        selectedStudentForEval = null
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(customEval.title)
+                                }
+                            }
+                        }
+
                         OutlinedTextField(
                             value = evalNoteInput,
                             onValueChange = { evalNoteInput = it },
@@ -427,6 +465,77 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
                 dismissButton = {
                     TextButton(onClick = { selectedStudentForEval = null }) {
                         Text("إلغاء")
+                    }
+                }
+            )
+        }
+
+        // نافذة إدارة التقييمات المخصصة (إضافة وحذف)
+        if (showCustomEvalManager) {
+            AlertDialog(
+                onDismissRequest = { showCustomEvalManager = false },
+                title = { Text("إدارة التقييمات المخصصة") },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = newCustomEvalTitle,
+                                onValueChange = { newCustomEvalTitle = it },
+                                label = { Text("اسم التقييم الجديد") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    if (newCustomEvalTitle.isNotBlank()) {
+                                        viewModel.addCustomEvaluation(newCustomEvalTitle.trim(), isPositive = true)
+                                        newCustomEvalTitle = ""
+                                    }
+                                }
+                            ) {
+                                Text("إضافة")
+                            }
+                        }
+
+                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                        if (customEvaluations.isEmpty()) {
+                            Text("لا توجد تقييمات مخصصة بعد.")
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.heightIn(max = 200.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                items(customEvaluations) { customEval ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = customEval.title)
+                                        IconButton(onClick = { viewModel.deleteCustomEvaluation(customEval) }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "حذف",
+                                                tint = MaterialTheme.colorScheme.error
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showCustomEvalManager = false }) {
+                        Text("إغلاق")
                     }
                 }
             )
