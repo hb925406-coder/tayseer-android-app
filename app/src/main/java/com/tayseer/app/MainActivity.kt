@@ -12,8 +12,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
@@ -28,12 +30,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.tayseer.app.data.AttendanceStatus
 import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Student
 import com.tayseer.app.ui.FollowUpScreen
 import com.tayseer.app.ui.StudentViewModel
+import com.tayseer.app.util.DateUtils
 
 class MainActivity : ComponentActivity() {
 
@@ -129,6 +134,8 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
     val todayAttendance by viewModel.todayAttendance.collectAsState()
     val currentDate by viewModel.currentDate.collectAsState()
 
+    var showHijri by remember { mutableStateOf(true) }
+
     var showAddDialog by remember { mutableStateOf(false) }
     var studentNameInput by remember { mutableStateOf("") }
     var studentSectionInput by remember { mutableStateOf("") }
@@ -154,7 +161,7 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("تيسير - متابعة الحضور") },
+                title = { Text("تيسير - متابعة الحضور", fontWeight = FontWeight.Bold) },
                 actions = {
                     IconButton(onClick = { viewModel.setAllPresentForToday() }) {
                         Icon(Icons.Default.DoneAll, contentDescription = "تحضير الكل كحاضر")
@@ -183,22 +190,73 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 12.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = "التاريخ: $currentDate", style = MaterialTheme.typography.bodyMedium)
-                    Text(text = "حاضر: $presentCount | غائب: $absentCount", style = MaterialTheme.typography.bodyMedium)
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.CalendarMonth,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (showHijri) DateUtils.formatToHijri(currentDate) else DateUtils.formatGregorianArabic(currentDate),
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+
+                        TextButton(
+                            onClick = { showHijri = !showHijri },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = if (showHijri) "عرض الميلادي" else "عرض الهجري",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Divider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "حاضر: $presentCount طالب",
+                            color = Color(0xFF2E7D32),
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = "غائب: $absentCount طالب",
+                            color = Color(0xFFC62828),
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = "الإجمالي: ${students.size}",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
 
             Text(
-                text = "قائمة الطلاب (الإجمالي: ${students.size}) - اضغط على الطالب لتسجيل الحالة:",
+                text = "قائمة الطلاب - اضغط على الطالب لتسجيل الحالة:",
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -232,8 +290,8 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                         ) {
                             Row(
                                 modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
