@@ -31,12 +31,22 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+enum class UserRole(val title: String) {
+    ADMIN("الإدارة"),
+    TEACHER("المعلم"),
+    PARENT("ولي الأمر")
+}
+
 class StudentViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = AppDatabase.getDatabase(application)
     private val studentDao = database.studentDao()
     private val attendanceDao = database.attendanceDao()
     private val appDao = database.appDao()
+
+    // دور المستخدم الحالي (افتراضياً: الإدارة)
+    private val _currentUserRole = MutableStateFlow(UserRole.ADMIN)
+    val currentUserRole: StateFlow<UserRole> = _currentUserRole.asStateFlow()
 
     private val _students = MutableStateFlow<List<Student>>(emptyList())
     val students: StateFlow<List<Student>> = _students.asStateFlow()
@@ -98,6 +108,11 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
                 _students.value = list
             }
         }
+    }
+
+    fun setUserRole(role: UserRole) {
+        _currentUserRole.value = role
+        _importStatusMessage.value = "تم التبديل إلى وضع: ${role.title}"
     }
 
     fun onSearchQueryChange(newQuery: String) {
