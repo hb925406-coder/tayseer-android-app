@@ -1,22 +1,21 @@
 package com.tayseer.app.data
 
 import android.content.Context
-import androidx.room.Database
-import androidx.room.Entity
-import androidx.room.PrimaryKey
-import androidx.room.Room
-import androidx.room.RoomDatabase
+import androidx.room.*
+import kotlinx.coroutines.flow.Flow
 
+// 1. جدول الطلاب
 @Entity(tableName = "students")
 data class Student(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val name: String,
     val section: String = "عام",
-    val academicYear: String = "1447-1448", // السنة الدراسية
-    val isArchived: Boolean = false // أرشفة السنة السابقة
+    val academicYear: String = "1447-1448",
+    val isArchived: Boolean = false
 )
 
+// 2. جدول سجلات الحضور
 @Entity(tableName = "attendance_records")
 data class AttendanceRecord(
     @PrimaryKey(autoGenerate = true)
@@ -37,6 +36,7 @@ data class AttendanceRecord(
         }
 }
 
+// 3. جدول سجلات التقييم
 @Entity(tableName = "evaluations")
 data class EvaluationRecord(
     @PrimaryKey(autoGenerate = true)
@@ -47,6 +47,7 @@ data class EvaluationRecord(
     val note: String? = null
 )
 
+// 4. جدول التقييمات المخصصة
 @Entity(tableName = "custom_evaluations")
 data class CustomEvaluation(
     @PrimaryKey(autoGenerate = true)
@@ -55,6 +56,56 @@ data class CustomEvaluation(
     val isPositive: Boolean = true
 )
 
+// DAOs
+@Dao
+interface AttendanceDao {
+    @Query("SELECT * FROM attendance_records WHERE date = :date")
+    fun getAttendanceByDate(date: String): Flow<List<AttendanceRecord>>
+
+    @Query("SELECT * FROM attendance_records WHERE date = :date")
+    suspend fun getAttendanceListByDateSync(date: String): List<AttendanceRecord>
+
+    @Query("SELECT * FROM attendance_records WHERE studentId = :studentId AND date = :date LIMIT 1")
+    suspend fun getRecordForStudent(studentId: Long, date: String): AttendanceRecord?
+
+    @Query("SELECT * FROM attendance_records WHERE studentId = :studentId ORDER BY date DESC")
+    suspend fun getAttendanceForStudentSync(studentId: Long): List<AttendanceRecord>
+
+    @Query("SELECT * FROM attendance_records WHERE (status = 'ABSENT' OR status = 'LATE' OR status = 'TRUANT') AND isFollowedUp = 0 ORDER BY date DESC")
+    fun getPendingAlerts(): Flow<List<AttendanceRecord>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAttendance(record: AttendanceRecord)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAttendanceList(records: List<AttendanceRecord>)
+
+    @Query("UPDATE attendance_records SET isFollowedUp = 1, followUpMethod = :method, followUpNote = :note WHERE id = :recordId")
+    suspend fun resolveFollowUp(recordId: Long, method: String, note: String)
+}
+
+@Dao
+interface EvaluationDao {
+    @Query("SELECT * FROM evaluations WHERE studentId = :studentId ORDER BY date DESC")
+    fun getEvaluationsForStudent(studentId: Long): Flow<List<EvaluationRecord>>
+
+    @Query("SELECT * FROM evaluations WHERE studentId = :studentId ORDER BY date DESC")
+    suspend fun getEvaluationsForStudentSync(studentId: Long): List<EvaluationRecord>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEvaluation(evaluation: EvaluationRecord)
+
+    @Query("SELECT * FROM custom_evaluations ORDER BY id ASC")
+    fun getAllCustomEvaluations(): Flow<List<CustomEvaluation>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCustomEvaluation(evaluation: CustomEvaluation)
+
+    @Delete
+    suspend fun deleteCustomEvaluation(evaluation: CustomEvaluation)
+}
+
+// تعريف قاعدة البيانات الكاملة
 @Database(
     entities = [
         Student::class,
