@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -218,6 +219,48 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
                 context.startActivity(chooser)
             } catch (e: Exception) {
                 _importStatusMessage.value = "تعذر إنشاء ملف التقرير: ${e.localizedMessage}"
+            }
+        }
+    }
+
+    // تصدير ومشاركة خلاصة الطالب المفصلة بصيغة PDF
+    fun exportAndShareStudentSummary(context: Context, student: Student) {
+        viewModelScope.launch {
+            try {
+                val evals = withContext(Dispatchers.IO) {
+                    appDao.getEvaluationsForStudent(student.id).first()
+                }
+                val attendanceHistory = withContext(Dispatchers.IO) {
+                    attendanceDao.getAttendanceForStudent(student.id).first()
+                }
+
+                val pdfFile = withContext(Dispatchers.IO) {
+                    PdfReportGenerator.generateStudentSummaryPdf(
+                        context = context,
+                        student = student,
+                        attendanceList = attendanceHistory,
+                        evaluationList = evals
+                    )
+                }
+
+                val fileUri: Uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    pdfFile
+                )
+
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    putExtra(Intent.EXTRA_STREAM, fileUri)
+                    putExtra(Intent.EXTRA_SUBJECT, "تقرير خلاصة الطالب: ${student.name}")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+
+                val chooser = Intent.createChooser(shareIntent, "مشاركة خلاصة الطالب عبر:")
+                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(chooser)
+            } catch (e: Exception) {
+                _importStatusMessage.value = "تعذر إنشاء خلاصة الطالب: ${e.localizedMessage}"
             }
         }
     }
