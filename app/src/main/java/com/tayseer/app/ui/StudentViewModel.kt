@@ -1,7 +1,10 @@
 package com.tayseer.app.ui
 
 import android.app.Application
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tayseer.app.data.AppDatabase
@@ -11,6 +14,8 @@ import com.tayseer.app.data.CsvImporter
 import com.tayseer.app.data.CustomEvaluation
 import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Student
+import com.tayseer.app.util.PdfReportGenerator
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -172,6 +178,49 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun getStudentEvaluations(studentId: Long) = appDao.getEvaluationsForStudent(studentId)
+
+    // تصدير ومشاركة تقرير كشف الحضور اليومي بصيغة PDF
+    fun exportAndShareDailyReport(context: Context, formattedDateDisplay: String) {
+        viewModelScope.launch {
+            try {
+                val currentStudents = _students.value
+                val currentRecords = todayAttendance.value
+                if (currentStudents.isEmpty()) {
+                    _importStatusMessage.value = "لا يوجد طلاب لإنشاء التقرير"
+                    return@launch
+                }
+
+                val pdfFile = withContext(Dispatchers.IO) {
+                    PdfReportGenerator.generateDailyReportPdf(
+                        context = context,
+                        students = currentStudents,
+                        records = currentRecords,
+                        dateString = formattedDateDisplay,
+                        section = "جميع الحلقات"
+                    )
+                }
+
+                val fileUri: Uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    pdfFile
+                )
+
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/pdf"
+                    putExtra(Intent.EXTRA_STREAM, fileUri)
+                    putExtra(Intent.EXTRA_SUBJECT, "كشف حضور تيسير - $formattedDateDisplay")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+
+                val chooser = Intent.createChooser(shareIntent, "مشاركة تقرير تيسير عبر:")
+                chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(chooser)
+            } catch (e: Exception) {
+                _importStatusMessage.value = "تعذر إنشاء ملف التقرير: ${e.localizedMessage}"
+            }
+        }
+    }
 
     fun clearStatusMessage() {
         _importStatusMessage.value = null
