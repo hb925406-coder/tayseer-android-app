@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.UploadFile
@@ -28,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.tayseer.app.data.AttendanceStatus
+import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Student
 import com.tayseer.app.ui.StudentViewModel
 
@@ -333,6 +335,7 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
     val customEvaluations by viewModel.customEvaluations.collectAsState()
 
     var selectedStudentForEval by remember { mutableStateOf<Student?>(null) }
+    var selectedStudentForHistory by remember { mutableStateOf<Student?>(null) }
     var evalNoteInput by remember { mutableStateOf("") }
     var showCustomEvalManager by remember { mutableStateOf(false) }
     var newCustomEvalTitle by remember { mutableStateOf("") }
@@ -358,7 +361,7 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
                 .padding(16.dp)
         ) {
             Text(
-                text = "اختر طالباً لتسجيل تقييم وسلوك يومي له:",
+                text = "اختر طالباً لتسجيل التقييم أو استعراض سجله:",
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -384,19 +387,28 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp),
+                                    .padding(12.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(text = student.name, style = MaterialTheme.typography.titleMedium)
                                     Text(text = "الحلقة/الشعبة: ${student.section}", style = MaterialTheme.typography.bodySmall)
                                 }
-                                Button(onClick = {
-                                    selectedStudentForEval = student
-                                    evalNoteInput = ""
-                                }) {
-                                    Text("تقييم")
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    IconButton(onClick = { selectedStudentForHistory = student }) {
+                                        Icon(
+                                            imageVector = Icons.Default.History,
+                                            contentDescription = "سجل التقييمات",
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    Button(onClick = {
+                                        selectedStudentForEval = student
+                                        evalNoteInput = ""
+                                    }) {
+                                        Text("تقييم")
+                                    }
                                 }
                             }
                         }
@@ -405,7 +417,7 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
             }
         }
 
-        // نافذة تقييم الطالب
+        // نافذة تسجيل تقييم للطالب
         selectedStudentForEval?.let { student ->
             AlertDialog(
                 onDismissRequest = { selectedStudentForEval = null },
@@ -470,7 +482,74 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
             )
         }
 
-        // نافذة إدارة التقييمات المخصصة (إضافة وحذف)
+        // نافذة عرض سجل تقييمات الطالب السابق
+        selectedStudentForHistory?.let { student ->
+            val historyFlow = remember(student.id) { viewModel.getStudentEvaluations(student.id) }
+            val historyList by historyFlow.collectAsState(initial = emptyList())
+
+            AlertDialog(
+                onDismissRequest = { selectedStudentForHistory = null },
+                title = { Text("سجل تقييمات: ${student.name}") },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 350.dp)
+                    ) {
+                        if (historyList.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("لا توجد تقييمات مسجلة لهذا الطالب بعد.")
+                            }
+                        } else {
+                            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(historyList) { record ->
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                    ) {
+                                        Column(modifier = Modifier.padding(10.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(
+                                                    text = record.evaluationType,
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                Text(
+                                                    text = record.date,
+                                                    style = MaterialTheme.typography.bodySmall
+                                                )
+                                            }
+                                            if (!record.note.isNullOrBlank()) {
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    text = "ملاحظة: ${record.note}",
+                                                    style = MaterialTheme.typography.bodySmall
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { selectedStudentForHistory = null }) {
+                        Text("إغلاق")
+                    }
+                }
+            )
+        }
+
+        // نافذة إدارة التقييمات المخصصة
         if (showCustomEvalManager) {
             AlertDialog(
                 onDismissRequest = { showCustomEvalManager = false },
