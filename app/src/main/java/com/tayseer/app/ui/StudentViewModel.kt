@@ -39,6 +39,9 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
         attendanceDao.getAttendanceByDate(date)
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    val pendingAlerts: StateFlow<List<AttendanceRecord>> = attendanceDao.getPendingFollowUps()
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     val customEvaluations: StateFlow<List<CustomEvaluation>> = appDao.getAllCustomEvaluations()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
@@ -105,7 +108,8 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
                     AttendanceRecord(
                         studentId = student.id,
                         date = date,
-                        status = AttendanceStatus.PRESENT.name
+                        status = AttendanceStatus.PRESENT.name,
+                        isResolved = true
                     )
                 }
                 attendanceDao.recordBulkAttendance(records)
@@ -116,13 +120,22 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
 
     fun updateStudentAttendance(studentId: Long, status: AttendanceStatus, note: String = "") {
         viewModelScope.launch {
+            val isResolvedState = (status == AttendanceStatus.PRESENT)
             val record = AttendanceRecord(
                 studentId = studentId,
                 date = _currentDate.value,
                 status = status.name,
-                reasonNote = note
+                reasonNote = note,
+                isResolved = isResolvedState
             )
             attendanceDao.recordAttendance(record)
+        }
+    }
+
+    fun resolveAlert(recordId: Long, method: String, note: String) {
+        viewModelScope.launch {
+            attendanceDao.resolveFollowUp(recordId, method, note)
+            _importStatusMessage.value = "تم توثيق العذر وإغلاق التنبيه بنجاح"
         }
     }
 
