@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -39,6 +40,32 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
 
     private val _students = MutableStateFlow<List<Student>>(emptyList())
     val students: StateFlow<List<Student>> = _students.asStateFlow()
+
+    // متغيرات البحث وتصفية الشعب والحلقات
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _selectedSection = MutableStateFlow("الكل")
+    val selectedSection: StateFlow<String> = _selectedSection.asStateFlow()
+
+    // قائمة الطلاب المفلترة تلقائياً بحسب البحث والشعبة
+    val filteredStudents: StateFlow<List<Student>> = combine(
+        _students,
+        _searchQuery,
+        _selectedSection
+    ) { studentList, query, section ->
+        studentList.filter { student ->
+            val matchesQuery = query.isBlank() || student.name.contains(query.trim(), ignoreCase = true)
+            val matchesSection = section == "الكل" || student.section == section
+            matchesQuery && matchesSection
+        }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    // قائمة أسماء الحلقات/الشعب المتاحة
+    val availableSections: StateFlow<List<String>> = _students.flatMapLatest { list ->
+        val sections = listOf("الكل") + list.map { it.section }.distinct().filter { it.isNotBlank() }
+        MutableStateFlow(sections)
+    }.stateIn(viewModelScope, SharingStarted.Lazily, listOf("الكل"))
 
     private val _currentDate = MutableStateFlow(getTodayDateString())
     val currentDate: StateFlow<String> = _currentDate.asStateFlow()
@@ -71,6 +98,14 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
                 _students.value = list
             }
         }
+    }
+
+    fun onSearchQueryChange(newQuery: String) {
+        _searchQuery.value = newQuery
+    }
+
+    fun onSectionSelect(section: String) {
+        _selectedSection.value = section
     }
 
     fun addStudent(student: Student) {
@@ -110,9 +145,9 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
     fun setAllPresentForToday() {
         viewModelScope.launch {
             val date = _currentDate.value
-            val currentList = _students.value
-            if (currentList.isNotEmpty()) {
-                val records = currentList.map { student ->
+            val targetList = filteredStudents.value.ifEmpty { _students.value }
+            if (targetList.isNotEmpty()) {
+                val records = targetList.map { student ->
                     AttendanceRecord(
                         studentId = student.id,
                         date = date,
@@ -121,7 +156,7 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
                     )
                 }
                 attendanceDao.recordBulkAttendance(records)
-                _importStatusMessage.value = "تم تحضير جميع الطلاب كـ (حاضر)"
+                _importStatusMessage.value = "تم تحضير (${targetList.size}) طالب كـ (حاضر)"
             }
         }
     }
@@ -185,12 +220,14 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
     fun exportAndShareDailyReport(context: Context, formattedDateDisplay: String) {
         viewModelScope.launch {
             try {
-                val currentStudents = _students.value
+                val currentStudents = filteredStudents.value.ifEmpty { _students.value }
                 val currentRecords = todayAttendance.value
                 if (currentStudents.isEmpty()) {
                     _importStatusMessage.value = "لا يوجد طلاب لإنشاء التقرير"
                     return@launch
                 }
+
+                val sectionTitle = if (_selectedSection.value == "الكل") "جميع الحلقات" else _selectedSection.value
 
                 val pdfFile = withContext(Dispatchers.IO) {
                     PdfReportGenerator.generateDailyReportPdf(
@@ -198,7 +235,7 @@ class StudentViewModel(application: Application) : AndroidViewModel(application)
                         students = currentStudents,
                         records = currentRecords,
                         dateString = formattedDateDisplay,
-                        section = "جميع الحلقات"
+                        section = sectionTitle
                     )
                 }
 
