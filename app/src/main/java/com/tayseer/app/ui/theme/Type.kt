@@ -2,13 +2,69 @@ package com.tayseer.app.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+
+// ضبط الخطوط القياسية المدمجة لضمان التوافق التام 100% دون أخطاء بناء
+private val AppFontFamily = FontFamily.SansSerif
+
+private val LocalTayseerTypography = Typography(
+    displayLarge = TextStyle(
+        fontFamily = AppFontFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = 30.sp
+    ),
+    titleLarge = TextStyle(
+        fontFamily = AppFontFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = 20.sp
+    ),
+    titleMedium = TextStyle(
+        fontFamily = AppFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 17.sp
+    ),
+    titleSmall = TextStyle(
+        fontFamily = AppFontFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 14.sp
+    ),
+    bodyLarge = TextStyle(
+        fontFamily = AppFontFamily,
+        fontWeight = FontWeight.Normal,
+        fontSize = 15.sp
+    ),
+    bodyMedium = TextStyle(
+        fontFamily = AppFontFamily,
+        fontWeight = FontWeight.Normal,
+        fontSize = 13.sp
+    ),
+    bodySmall = TextStyle(
+        fontFamily = AppFontFamily,
+        fontWeight = FontWeight.Normal,
+        fontSize = 11.sp
+    ),
+    labelLarge = TextStyle(
+        fontFamily = AppFontFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 13.sp
+    ),
+    labelMedium = TextStyle(
+        fontFamily = AppFontFamily,
+        fontWeight = FontWeight.Normal,
+        fontSize = 11.sp
+    )
+)
 
 // لوحة ألوان الوضع الداكن (Dark Mode)
-private val DarkColorScheme = darkColorScheme(
+private val DarkColors = darkColorScheme(
     primary = Color(0xFF90CAF9),
     onPrimary = Color(0xFF0D47A1),
     primaryContainer = Color(0xFF1E3A5F),
@@ -25,7 +81,7 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 // لوحة ألوان الوضع الفاتح (Light Mode)
-private val LightColorScheme = lightColorScheme(
+private val LightColors = lightColorScheme(
     primary = Color(0xFF1976D2),
     onPrimary = Color.White,
     primaryContainer = Color(0xFFE3F2FD),
@@ -46,11 +102,11 @@ fun TayseerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = if (darkTheme) DarkColors else LightColors
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = TayseerTypography,
+        typography = LocalTayseerTypography,
         content = content
     )
 }
