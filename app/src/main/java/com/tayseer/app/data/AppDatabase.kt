@@ -4,28 +4,7 @@ import android.content.Context
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
-// 1. جدول سجلات الحضور
-@Entity(tableName = "attendance_records")
-data class AttendanceRecord(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
-    val studentId: Long,
-    val date: String,
-    val status: String,
-    val reasonNote: String? = null,
-    val isFollowedUp: Boolean = false,
-    val followUpMethod: String? = null,
-    val followUpNote: String? = null
-) {
-    val statusEnum: AttendanceStatus
-        get() = try {
-            AttendanceStatus.valueOf(status)
-        } catch (e: Exception) {
-            AttendanceStatus.PRESENT
-        }
-}
-
-// 2. جدول سجلات التقييم
+// 1. جدول سجلات التقييم
 @Entity(tableName = "evaluations")
 data class EvaluationRecord(
     @PrimaryKey(autoGenerate = true)
@@ -36,7 +15,7 @@ data class EvaluationRecord(
     val note: String? = null
 )
 
-// 3. جدول التقييمات المخصصة
+// 2. جدول التقييمات المخصصة
 @Entity(tableName = "custom_evaluations")
 data class CustomEvaluation(
     @PrimaryKey(autoGenerate = true)
