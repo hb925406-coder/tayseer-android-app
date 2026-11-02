@@ -34,10 +34,10 @@ interface AttendanceDao {
     @Query("SELECT COUNT(*) FROM attendance WHERE studentId = :studentId AND status = :status")
     suspend fun countStatusForStudent(studentId: Long, status: String): Int
 
-    // دوال قسم التنبيهات والمتابعة
-    @Query("SELECT * FROM attendance WHERE (status = 'ABSENT' OR status = 'LATE' OR status = 'TRUANT') AND followUpResolved = 0 ORDER BY date DESC")
+    // استعلامات قسم التنبيهات والمتابعة المطابقة لجدول attendance
+    @Query("SELECT * FROM attendance WHERE (status IN ('غائب', 'ABSENT', 'متأخر', 'LATE', 'هارب', 'TRUANT', 'ESCAPED')) AND isResolved = 0 ORDER BY date DESC")
     fun getPendingFollowUps(): Flow<List<AttendanceRecord>>
 
-    @Query("UPDATE attendance SET followUpResolved = 1, followUpMethod = :method, reasonNote = :note WHERE id = :recordId")
-    suspend fun resolveFollowUp(recordId: Long, method: String, note: String?)
+    @Query("UPDATE attendance SET isResolved = 1, excuseType = :method, excuseReason = :note WHERE id = :recordId")
+    suspend fun resolveFollowUp(recordId: Long, method: String, note: String)
 }
