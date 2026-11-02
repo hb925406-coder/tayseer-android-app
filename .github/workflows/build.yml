@@ -24,21 +24,33 @@ jobs:
       with:
         gradle-version: '8.5'
 
-    - name: Generate Consistent Keystore
-      run: |
-        keytool -genkeypair -v -keystore tayseer-release.jks -alias tayseer -keyalg RSA -keysize 2048 -validity 10000 -storepass tayseer123 -keypass tayseer123 -dname "CN=TayseerApp, OU=Dev, O=Tayseer, L=City, S=State, C=YE"
-
     - name: Build APK with Gradle
-      run: gradle assembleDebug --stacktrace
+      run: ./gradlew assembleRelease || ./gradlew assembleDebug --stacktrace
 
-    - name: Sign APK with Consistent Key
+    - name: Sign APK with Fixed Tayseer Key
       run: |
-        APK_PATH=$(find app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
-        BUILD_TOOLS_DIR=$(find $ANDROID_HOME/build-tools/ -maxdepth 1 -mindepth 1 | sort -V | tail -n 1)
-        $BUILD_TOOLS_DIR/apksigner sign --ks tayseer-release.jks --ks-pass pass:tayseer123 --ks-key-alias tayseer --key-pass pass:tayseer123 --out app/build/outputs/apk/debug/tayseer-signed.apk "$APK_PATH"
+        APK_FILE=$(find app/build/outputs/apk/ -name "*.apk" | head -n 1)
+        keytool -genkeypair -v \
+          -keystore permanent-tayseer.jks \
+          -alias tayseerkey \
+          -keyalg RSA \
+          -keysize 2048 \
+          -validity 20000 \
+          -storepass tayseerApp2026 \
+          -keypass tayseerApp2026 \
+          -dname "CN=Tayseer, OU=App, O=TayseerOrg, L=Tarim, ST=Hadhramaut, C=YE"
+        
+        BUILD_TOOLS=$(find $ANDROID_HOME/build-tools/ -maxdepth 1 -mindepth 1 | sort -V | tail -n 1)
+        $BUILD_TOOLS/zipalign -v -p 4 "$APK_FILE" aligned-tayseer.apk
+        $BUILD_TOOLS/apksigner sign \
+          --ks permanent-tayseer.jks \
+          --ks-pass pass:tayseerApp2026 \
+          --ks-key-alias tayseerkey \
+          --key-pass pass:tayseerApp2026 \
+          --out tayseer-release-fixed.apk aligned-tayseer.apk
 
-    - name: Upload Tayseer APK
+    - name: Upload Tayseer Fixed APK
       uses: actions/upload-artifact@v4
       with:
-        name: tayseer-app-signed
-        path: app/build/outputs/apk/debug/tayseer-signed.apk
+        name: tayseer-apk-update
+        path: tayseer-release-fixed.apk
