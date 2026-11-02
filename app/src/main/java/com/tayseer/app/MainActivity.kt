@@ -49,6 +49,7 @@ import com.tayseer.app.data.Student
 import com.tayseer.app.ui.FollowUpScreen
 import com.tayseer.app.ui.StudentViewModel
 import com.tayseer.app.ui.UserRole
+import com.tayseer.app.ui.theme.TayseerTheme
 import com.tayseer.app.util.DateUtils
 
 class MainActivity : ComponentActivity() {
@@ -58,7 +59,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            TayseerTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -98,7 +99,6 @@ fun TayseerMainApp(viewModel: StudentViewModel) {
                     icon = { Icon(Icons.Default.CheckCircle, contentDescription = "الحضور والغياب") },
                     label = { Text("الحضور والغياب") }
                 )
-                // شاشة المتابعة متاحة للإدارة والمعلم فقط
                 if (currentRole != UserRole.PARENT) {
                     NavigationBarItem(
                         selected = selectedTab == 1,
@@ -204,26 +204,22 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                     }
                 },
                 actions = {
-                    // زر اختيار وتبديل الدور
                     IconButton(onClick = { showRoleDialog = true }) {
                         Icon(Icons.Default.AccountCircle, contentDescription = "تبديل الدور")
                     }
 
-                    // تحضير الكل متاح للإدارة والمعلم فقط
                     if (currentRole != UserRole.PARENT) {
                         IconButton(onClick = { viewModel.setAllPresentForToday() }) {
                             Icon(Icons.Default.DoneAll, contentDescription = "تحضير الكل كحاضر")
                         }
                     }
 
-                    // تصدير PDF متاح للجميع
                     IconButton(onClick = {
                         viewModel.exportAndShareDailyReport(context, displayDate)
                     }) {
                         Icon(Icons.Default.PictureAsPdf, contentDescription = "مشاركة تقرير PDF اليومي", tint = MaterialTheme.colorScheme.primary)
                     }
 
-                    // استيراد الطلاب متاح للإدارة فقط
                     if (currentRole == UserRole.ADMIN) {
                         IconButton(onClick = {
                             filePickerLauncher.launch(arrayOf("text/*", "application/*"))
@@ -232,7 +228,6 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                         }
                     }
 
-                    // النسخ الاحتياطي متاح للإدارة فقط
                     if (currentRole == UserRole.ADMIN) {
                         Box {
                             IconButton(onClick = { showMenu = !showMenu }) {
@@ -269,7 +264,6 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
             )
         },
         floatingActionButton = {
-            // إضافة طالب متاح للإدارة فقط
             if (currentRole == UserRole.ADMIN) {
                 FloatingActionButton(onClick = { showAddDialog = true }) {
                     Icon(Icons.Default.Add, contentDescription = "إضافة طالب")
@@ -283,7 +277,6 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            // شريط البحث
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { viewModel.onSearchQueryChange(it) },
@@ -303,7 +296,6 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                 shape = RoundedCornerShape(12.dp)
             )
 
-            // شرائح تصفية الحلقات والأقسام
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -466,7 +458,6 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
             }
         }
 
-        // نافذة اختيار الدور
         if (showRoleDialog) {
             AlertDialog(
                 onDismissRequest = { showRoleDialog = false },
@@ -608,7 +599,6 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
             TopAppBar(
                 title = { Text("تيسير - التقييم والسلوك") },
                 actions = {
-                    // إدارة التقييمات المخصصة متاحة للإدارة فقط
                     if (currentRole == UserRole.ADMIN) {
                         IconButton(onClick = { showCustomEvalManager = true }) {
                             Icon(Icons.Default.Settings, contentDescription = "إدارة التقييمات المخصصة")
