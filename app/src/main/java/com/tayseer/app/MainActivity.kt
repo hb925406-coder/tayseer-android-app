@@ -15,13 +15,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
@@ -138,6 +141,7 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
     val currentDate by viewModel.currentDate.collectAsState()
 
     var showHijri by remember { mutableStateOf(true) }
+    var showMenu by remember { mutableStateOf(false) }
 
     var showAddDialog by remember { mutableStateOf(false) }
     var studentNameInput by remember { mutableStateOf("") }
@@ -150,6 +154,12 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let { viewModel.importStudentsFromCsv(it) }
+    }
+
+    val restoreDbPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.restoreDatabase(context, it) }
     }
 
     val attendanceMap = remember(todayAttendance) {
@@ -180,6 +190,36 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                         filePickerLauncher.launch(arrayOf("text/*", "application/*"))
                     }) {
                         Icon(Icons.Default.UploadFile, contentDescription = "استيراد ملف")
+                    }
+                    Box {
+                        IconButton(onClick = { showMenu = !showMenu }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "المزيد من الخيارات")
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("إنشاء نسخة احتياطية") },
+                                onClick = {
+                                    showMenu = false
+                                    viewModel.backupDatabase(context)
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Backup, contentDescription = null)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("استعادة نسخة احتياطية") },
+                                onClick = {
+                                    showMenu = false
+                                    restoreDbPickerLauncher.launch(arrayOf("*/*"))
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Restore, contentDescription = null)
+                                }
+                            )
+                        }
                     }
                 }
             )
