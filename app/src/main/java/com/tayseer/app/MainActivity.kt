@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -47,6 +48,7 @@ import com.tayseer.app.data.EvaluationRecord
 import com.tayseer.app.data.Student
 import com.tayseer.app.ui.FollowUpScreen
 import com.tayseer.app.ui.StudentViewModel
+import com.tayseer.app.ui.UserRole
 import com.tayseer.app.util.DateUtils
 
 class MainActivity : ComponentActivity() {
@@ -75,6 +77,7 @@ fun TayseerMainApp(viewModel: StudentViewModel) {
     var selectedTab by remember { mutableStateOf(0) }
     val statusMessage by viewModel.importStatusMessage.collectAsState()
 
+    val currentRole by viewModel.currentUserRole.collectAsState()
     val pendingAlerts by viewModel.pendingAlerts.collectAsState(initial = emptyList())
     val students by viewModel.students.collectAsState(initial = emptyList())
     val studentsMap = remember(students) { students.associateBy { it.id } }
@@ -95,22 +98,25 @@ fun TayseerMainApp(viewModel: StudentViewModel) {
                     icon = { Icon(Icons.Default.CheckCircle, contentDescription = "الحضور والغياب") },
                     label = { Text("الحضور والغياب") }
                 )
-                NavigationBarItem(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    icon = {
-                        BadgedBox(
-                            badge = {
-                                if (pendingAlerts.isNotEmpty()) {
-                                    Badge { Text("${pendingAlerts.size}") }
+                // شاشة المتابعة متاحة للإدارة والمعلم فقط
+                if (currentRole != UserRole.PARENT) {
+                    NavigationBarItem(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        icon = {
+                            BadgedBox(
+                                badge = {
+                                    if (pendingAlerts.isNotEmpty()) {
+                                        Badge { Text("${pendingAlerts.size}") }
+                                    }
                                 }
+                            ) {
+                                Icon(Icons.Default.Notifications, contentDescription = "التنبيهات والمتابعة")
                             }
-                        ) {
-                            Icon(Icons.Default.Notifications, contentDescription = "التنبيهات والمتابعة")
-                        }
-                    },
-                    label = { Text("المتابعة") }
-                )
+                        },
+                        label = { Text("المتابعة") }
+                    )
+                }
                 NavigationBarItem(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
@@ -123,13 +129,19 @@ fun TayseerMainApp(viewModel: StudentViewModel) {
         Box(modifier = Modifier.padding(innerPadding)) {
             when (selectedTab) {
                 0 -> AttendanceScreen(viewModel = viewModel)
-                1 -> FollowUpScreen(
-                    pendingRecords = pendingAlerts,
-                    studentsMap = studentsMap,
-                    onResolveFollowUp = { recordId, method, note ->
-                        viewModel.resolveAlert(recordId, method, note)
+                1 -> {
+                    if (currentRole != UserRole.PARENT) {
+                        FollowUpScreen(
+                            pendingRecords = pendingAlerts,
+                            studentsMap = studentsMap,
+                            onResolveFollowUp = { recordId, method, note ->
+                                viewModel.resolveAlert(recordId, method, note)
+                            }
+                        )
+                    } else {
+                        AttendanceScreen(viewModel = viewModel)
                     }
-                )
+                }
                 2 -> EvaluationsScreen(viewModel = viewModel)
             }
         }
@@ -140,6 +152,7 @@ fun TayseerMainApp(viewModel: StudentViewModel) {
 @Composable
 fun AttendanceScreen(viewModel: StudentViewModel) {
     val context = LocalContext.current
+    val currentRole by viewModel.currentUserRole.collectAsState()
     val filteredStudents by viewModel.filteredStudents.collectAsState()
     val availableSections by viewModel.availableSections.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -149,6 +162,7 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
 
     var showHijri by remember { mutableStateOf(true) }
     var showMenu by remember { mutableStateOf(false) }
+    var showRoleDialog by remember { mutableStateOf(false) }
 
     var showAddDialog by remember { mutableStateOf(false) }
     var studentNameInput by remember { mutableStateOf("") }
@@ -183,57 +197,83 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("تيسير - متابعة الحضور", fontWeight = FontWeight.Bold) },
-                actions = {
-                    IconButton(onClick = { viewModel.setAllPresentForToday() }) {
-                        Icon(Icons.Default.DoneAll, contentDescription = "تحضير الكل كحاضر")
+                title = {
+                    Column {
+                        Text("تيسير - متابعة الحضور", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text("الوضع الحالي: ${currentRole.title}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     }
+                },
+                actions = {
+                    // زر اختيار وتبديل الدور
+                    IconButton(onClick = { showRoleDialog = true }) {
+                        Icon(Icons.Default.AccountCircle, contentDescription = "تبديل الدور")
+                    }
+
+                    // تحضير الكل متاح للإدارة والمعلم فقط
+                    if (currentRole != UserRole.PARENT) {
+                        IconButton(onClick = { viewModel.setAllPresentForToday() }) {
+                            Icon(Icons.Default.DoneAll, contentDescription = "تحضير الكل كحاضر")
+                        }
+                    }
+
+                    // تصدير PDF متاح للجميع
                     IconButton(onClick = {
                         viewModel.exportAndShareDailyReport(context, displayDate)
                     }) {
                         Icon(Icons.Default.PictureAsPdf, contentDescription = "مشاركة تقرير PDF اليومي", tint = MaterialTheme.colorScheme.primary)
                     }
-                    IconButton(onClick = {
-                        filePickerLauncher.launch(arrayOf("text/*", "application/*"))
-                    }) {
-                        Icon(Icons.Default.UploadFile, contentDescription = "استيراد ملف")
-                    }
-                    Box {
-                        IconButton(onClick = { showMenu = !showMenu }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "المزيد من الخيارات")
+
+                    // استيراد الطلاب متاح للإدارة فقط
+                    if (currentRole == UserRole.ADMIN) {
+                        IconButton(onClick = {
+                            filePickerLauncher.launch(arrayOf("text/*", "application/*"))
+                        }) {
+                            Icon(Icons.Default.UploadFile, contentDescription = "استيراد ملف")
                         }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("إنشاء نسخة احتياطية") },
-                                onClick = {
-                                    showMenu = false
-                                    viewModel.backupDatabase(context)
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Backup, contentDescription = null)
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("استعادة نسخة احتياطية") },
-                                onClick = {
-                                    showMenu = false
-                                    restoreDbPickerLauncher.launch(arrayOf("*/*"))
-                                },
-                                leadingIcon = {
-                                    Icon(Icons.Default.Restore, contentDescription = null)
-                                }
-                            )
+                    }
+
+                    // النسخ الاحتياطي متاح للإدارة فقط
+                    if (currentRole == UserRole.ADMIN) {
+                        Box {
+                            IconButton(onClick = { showMenu = !showMenu }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "المزيد من الخيارات")
+                            }
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("إنشاء نسخة احتياطية") },
+                                    onClick = {
+                                        showMenu = false
+                                        viewModel.backupDatabase(context)
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Backup, contentDescription = null)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("استعادة نسخة احتياطية") },
+                                    onClick = {
+                                        showMenu = false
+                                        restoreDbPickerLauncher.launch(arrayOf("*/*"))
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Restore, contentDescription = null)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "إضافة طالب")
+            // إضافة طالب متاح للإدارة فقط
+            if (currentRole == UserRole.ADMIN) {
+                FloatingActionButton(onClick = { showAddDialog = true }) {
+                    Icon(Icons.Default.Add, contentDescription = "إضافة طالب")
+                }
             }
         }
     ) { paddingValues ->
@@ -350,7 +390,7 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
             }
 
             Text(
-                text = "قائمة الطلاب - اضغط على الطالب لتسجيل الحالة:",
+                text = if (currentRole != UserRole.PARENT) "قائمة الطلاب - اضغط على الطالب لتسجيل الحالة:" else "قائمة الطلاب (وضع العرض):",
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -364,7 +404,7 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                         if (searchQuery.isNotEmpty() || selectedSection != "الكل")
                             "لا توجد نتائج مطابقة للبحث أو الحلقة المحددة."
                         else
-                            "لا يوجد طلاب مسجلون حالياً. استخدم زر + لإضافة طالب."
+                            "لا يوجد طلاب مسجلون حالياً."
                     )
                 }
             } else {
@@ -382,7 +422,7 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
+                                .clickable(enabled = (currentRole != UserRole.PARENT)) {
                                     selectedStudentForAttendance = student
                                     attendanceNoteInput = record?.reasonNote.orEmpty()
                                 }
@@ -407,8 +447,10 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                                 }
                                 SuggestionChip(
                                     onClick = {
-                                        selectedStudentForAttendance = student
-                                        attendanceNoteInput = record?.reasonNote.orEmpty()
+                                        if (currentRole != UserRole.PARENT) {
+                                            selectedStudentForAttendance = student
+                                            attendanceNoteInput = record?.reasonNote.orEmpty()
+                                        }
                                     },
                                     label = {
                                         Text(
@@ -422,6 +464,38 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
                     }
                 }
             }
+        }
+
+        // نافذة اختيار الدور
+        if (showRoleDialog) {
+            AlertDialog(
+                onDismissRequest = { showRoleDialog = false },
+                title = { Text("اختر دور المستخدم الحالي") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        UserRole.values().forEach { role ->
+                            OutlinedButton(
+                                onClick = {
+                                    viewModel.setUserRole(role)
+                                    showRoleDialog = false
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = if (currentRole == role) "✔ ${role.title}" else role.title,
+                                    fontWeight = if (currentRole == role) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { showRoleDialog = false }) {
+                        Text("إلغاء")
+                    }
+                }
+            )
         }
 
         selectedStudentForAttendance?.let { student ->
@@ -517,6 +591,7 @@ fun AttendanceScreen(viewModel: StudentViewModel) {
 @Composable
 fun EvaluationsScreen(viewModel: StudentViewModel) {
     val context = LocalContext.current
+    val currentRole by viewModel.currentUserRole.collectAsState()
     val filteredStudents by viewModel.filteredStudents.collectAsState()
     val customEvaluations by viewModel.customEvaluations.collectAsState()
 
@@ -533,8 +608,11 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
             TopAppBar(
                 title = { Text("تيسير - التقييم والسلوك") },
                 actions = {
-                    IconButton(onClick = { showCustomEvalManager = true }) {
-                        Icon(Icons.Default.Settings, contentDescription = "إدارة التقييمات المخصصة")
+                    // إدارة التقييمات المخصصة متاحة للإدارة فقط
+                    if (currentRole == UserRole.ADMIN) {
+                        IconButton(onClick = { showCustomEvalManager = true }) {
+                            Icon(Icons.Default.Settings, contentDescription = "إدارة التقييمات المخصصة")
+                        }
                     }
                 }
             )
@@ -547,7 +625,7 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
                 .padding(16.dp)
         ) {
             Text(
-                text = "اختر طالباً لتسجيل التقييم أو استعراض سجله:",
+                text = if (currentRole != UserRole.PARENT) "اختر طالباً لتسجيل التقييم أو استعراض سجله:" else "سجل تقييمات الطلاب:",
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
@@ -565,7 +643,7 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
+                                .clickable(enabled = (currentRole != UserRole.PARENT)) {
                                     selectedStudentForEval = student
                                     evalNoteInput = ""
                                 }
@@ -589,11 +667,13 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
                                             tint = MaterialTheme.colorScheme.primary
                                         )
                                     }
-                                    Button(onClick = {
-                                        selectedStudentForEval = student
-                                        evalNoteInput = ""
-                                    }) {
-                                        Text("تقييم")
+                                    if (currentRole != UserRole.PARENT) {
+                                        Button(onClick = {
+                                            selectedStudentForEval = student
+                                            evalNoteInput = ""
+                                        }) {
+                                            Text("تقييم")
+                                        }
                                     }
                                 }
                             }
@@ -755,7 +835,7 @@ fun EvaluationsScreen(viewModel: StudentViewModel) {
                 },
                 dismissButton = {
                     TextButton(onClick = { selectedStudentForHistory = null }) {
-                        Text("إلغاء")
+                        Text("إغلاق")
                     }
                 }
             )
