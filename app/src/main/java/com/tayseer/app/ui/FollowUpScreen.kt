@@ -6,7 +6,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,103 +16,97 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tayseer.app.data.AttendanceRecord
+import com.tayseer.app.data.AttendanceStatus
 import com.tayseer.app.data.Student
-import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FollowUpScreen(
     pendingRecords: List<AttendanceRecord>,
     studentsMap: Map<Long, Student>,
-    onResolveFollowUp: (recordId: Long, method: String, note: String) -> Unit,
-    modifier: Modifier = Modifier
+    onResolveFollowUp: (recordId: Long, method: String, note: String) -> Unit
 ) {
-    var selectedRecord by remember { mutableStateOf<AttendanceRecord?>(null) }
-    var selectedMethod by remember { mutableStateOf("ورقة من ولي الأمر") }
-    var noteText by remember { mutableStateOf("") }
-    val coroutineScope = rememberCoroutineScope()
+    var selectedRecordForResolve by remember { mutableStateOf<AttendanceRecord?>(null) }
+    var followUpMethod by remember { mutableStateOf("اتصال هاتف") }
+    var followUpNote by remember { mutableStateOf("") }
 
-    val excuseMethods = listOf(
-        "ورقة من ولي الأمر",
-        "اتصال هاتف",
-        "رسالة واتساب",
-        "رسالة SMS"
-    )
+    val followUpMethods = listOf("اتصال هاتف", "رسالة واتساب", "رسالة SMS", "ورقة من ولي الأمر")
 
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp)
     ) {
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-            shape = RoundedCornerShape(12.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
         ) {
             Row(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     imageVector = Icons.Default.Warning,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(36.dp)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
                         text = "التنبيهات والمتابعة",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "حالات الغياب والتأخير غير الموثقة: ${pendingRecords.size}",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
         if (pendingRecords.isEmpty()) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = Color(0xFF4CAF50),
-                        modifier = Modifier.size(56.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "رائع! لا توجد حالات غياب أو تأخير معلقة للمتابعة.",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = "رائع! لا توجد حالات غياب أو تأخير معلقة للمتابعة.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.outline
+                )
             }
         } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(pendingRecords, key = { it.id }) { record ->
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(pendingRecords) { record ->
                     val student = studentsMap[record.studentId]
+                    val studentName = student?.name ?: "طالب غير معروف"
+
+                    // تحويل الحالة الإنجليزية إلى التسمية العربية الرسمية لتطبيق تيسير مع لونها المناسب
+                    val statusText = when (record.status) {
+                        "ABSENT", "غائب" -> "غائب"
+                        "LATE", "متأخر" -> "متأخر"
+                        "TRUANT", "هارب" -> "هارب"
+                        "EXCUSED", "مستأذن" -> "مستأذن"
+                        "ABSENT_WITH_EXCUSE", "غائب بعذر" -> "غائب بعذر"
+                        else -> record.status
+                    }
+
+                    val badgeColor = when (record.status) {
+                        "ABSENT", "غائب" -> Color(0xFFE57373)
+                        "LATE", "متأخر" -> Color(0xFFFFB74D)
+                        "TRUANT", "هارب" -> Color(0xFFBA68C8)
+                        else -> MaterialTheme.colorScheme.error
+                    }
+
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
                             Row(
@@ -121,51 +114,49 @@ fun FollowUpScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = student?.name ?: "طالب #${record.studentId}",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Surface(
-                                    color = when (record.status) {
-                                        "غائب", "ABSENT" -> Color(0xFFE57373)
-                                        "متأخر", "LATE" -> Color(0xFFFFB74D)
-                                        else -> Color(0xFFBA68C8)
-                                    },
-                                    shape = RoundedCornerShape(6.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .background(badgeColor, shape = RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
                                 ) {
                                     Text(
-                                        text = record.status,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                        fontSize = 12.sp,
+                                        text = statusText,
                                         color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = studentName,
+                                        style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "التاريخ: ${record.date}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.outline
                                     )
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "التاريخ: ${record.date}",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            if (student?.parentPhone?.isNotEmpty() == true) {
+                            if (!record.reasonNote.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    text = "هاتف ولي الأمر: ${student.parentPhone}",
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = "السبب المبدئي: ${record.reasonNote}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
                                 )
                             }
 
                             Spacer(modifier = Modifier.height(10.dp))
+
                             Button(
                                 onClick = {
-                                    selectedRecord = record
-                                    selectedMethod = "ورقة من ولي الأمر"
-                                    noteText = ""
+                                    selectedRecordForResolve = record
+                                    followUpMethod = "اتصال هاتف"
+                                    followUpNote = ""
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(8.dp)
@@ -179,62 +170,58 @@ fun FollowUpScreen(
         }
     }
 
-    if (selectedRecord != null) {
-        val target = selectedRecord!!
-        val student = studentsMap[target.studentId]
+    selectedRecordForResolve?.let { record ->
+        val student = studentsMap[record.studentId]
+        val studentName = student?.name ?: "الطالب"
 
         AlertDialog(
-            onDismissRequest = { selectedRecord = null },
-            title = {
-                Text(
-                    text = "توثيق عذر: ${student?.name ?: "طالب"}",
-                    fontWeight = FontWeight.Bold
-                )
-            },
+            onDismissRequest = { selectedRecordForResolve = null },
+            title = { Text("توثيق عذر: $studentName") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text(
-                        text = "اختر وسيلة التوثيق:",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
+                        text = "طريقة التواصل والتبرير:",
+                        style = MaterialTheme.typography.labelMedium
                     )
 
-                    excuseMethods.forEach { method ->
+                    followUpMethods.forEach { method ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             RadioButton(
-                                selected = (selectedMethod == method),
-                                onClick = { selectedMethod = method }
+                                selected = (followUpMethod == method),
+                                onClick = { followUpMethod = method }
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = method, fontSize = 14.sp)
+                            Text(text = method)
                         }
                     }
 
                     OutlinedTextField(
-                        value = noteText,
-                        onValueChange = { noteText = it },
-                        label = { Text("سبب العذر / ملاحظة إضافية") },
-                        placeholder = { Text("مثال: مريض بتقرير طبي أو ظرف عائلي") },
+                        value = followUpNote,
+                        onValueChange = { followUpNote = it },
+                        label = { Text("تفاصيل العذر أو الملاحظة") },
                         modifier = Modifier.fillMaxWidth(),
-                        minLines = 2
+                        singleLine = false,
+                        maxLines = 3
                     )
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        onResolveFollowUp(target.id, selectedMethod, noteText)
-                        selectedRecord = null
+                        onResolveFollowUp(record.id, followUpMethod, followUpNote.trim())
+                        selectedRecordForResolve = null
                     }
                 ) {
-                    Text("حفظ وإنهاء المتابعة")
+                    Text("حفظ التوثيق")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { selectedRecord = null }) {
+                TextButton(onClick = { selectedRecordForResolve = null }) {
                     Text("إلغاء")
                 }
             }
