@@ -15,36 +15,7 @@ import androidx.room.RoomDatabase
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
-// 1. جدول سجلات الحضور والغياب
-@Entity(tableName = "attendance_records")
-data class AttendanceRecord(
-    @PrimaryKey(autoGenerate = true)
-    @ColumnInfo(name = "id")
-    val id: Long = 0,
-
-    @ColumnInfo(name = "studentId")
-    val studentId: Long = 0,
-
-    @ColumnInfo(name = "date")
-    val date: String = "",
-
-    @ColumnInfo(name = "status")
-    val status: String = "حاضر",
-
-    @ColumnInfo(name = "reasonNote")
-    val reasonNote: String = "",
-
-    @ColumnInfo(name = "isFollowedUp")
-    val isFollowedUp: Boolean = false,
-
-    @ColumnInfo(name = "followUpMethod")
-    val followUpMethod: String = "",
-
-    @ColumnInfo(name = "followUpNote")
-    val followUpNote: String = ""
-)
-
-// 2. جدول سجلات التقييم
+// 1. جدول سجلات التقييم
 @Entity(tableName = "evaluations")
 data class EvaluationRecord(
     @PrimaryKey(autoGenerate = true)
@@ -64,7 +35,7 @@ data class EvaluationRecord(
     val note: String = ""
 )
 
-// 3. جدول التقييمات المخصصة
+// 2. جدول التقييمات المخصصة
 @Entity(tableName = "custom_evaluations")
 data class CustomEvaluation(
     @PrimaryKey(autoGenerate = true)
