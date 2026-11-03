@@ -4,7 +4,21 @@ import android.content.Context
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
-// 1. جدول سجلات التقييم
+// 1. جدول سجلات الحضور والغياب
+@Entity(tableName = "attendance_records")
+data class AttendanceRecord(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val studentId: Long,
+    val date: String,
+    val status: String,
+    val reasonNote: String? = null,
+    val isFollowedUp: Boolean = false,
+    val followUpMethod: String? = null,
+    val followUpNote: String? = null
+)
+
+// 2. جدول سجلات التقييم
 @Entity(tableName = "evaluations")
 data class EvaluationRecord(
     @PrimaryKey(autoGenerate = true)
@@ -15,7 +29,7 @@ data class EvaluationRecord(
     val note: String? = null
 )
 
-// 2. جدول التقييمات المخصصة
+// 3. جدول التقييمات المخصصة
 @Entity(tableName = "custom_evaluations")
 data class CustomEvaluation(
     @PrimaryKey(autoGenerate = true)
@@ -24,7 +38,7 @@ data class CustomEvaluation(
     val isPositive: Boolean = true
 )
 
-// واجهة التعامل مع جدول الحضور
+// واجهة التعامل مع الحضور والغياب
 @Dao
 interface AttendanceDao {
     @Query("SELECT * FROM attendance_records WHERE date = :date")
@@ -52,7 +66,7 @@ interface AttendanceDao {
     suspend fun resolveFollowUp(recordId: Long, method: String, note: String)
 }
 
-// واجهة التعامل مع جدول الطلاب
+// واجهة التعامل مع الطلاب
 @Dao
 interface StudentDao {
     @Query("SELECT * FROM students WHERE isArchived = 0 ORDER BY name ASC")
@@ -86,7 +100,7 @@ interface StudentDao {
     suspend fun archiveCurrentYearStudents(currentYear: String)
 }
 
-// واجهة التعامل مع جدول التقييمات
+// واجهة التعامل مع التقييمات
 @Dao
 interface EvaluationDao {
     @Query("SELECT * FROM evaluations WHERE studentId = :studentId ORDER BY date DESC")
