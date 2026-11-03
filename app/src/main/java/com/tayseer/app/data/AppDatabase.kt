@@ -49,34 +49,6 @@ data class CustomEvaluation(
     val isPositive: Boolean = true
 )
 
-// واجهة التعامل مع الحضور والغياب
-@Dao
-interface AttendanceDao {
-    @Query("SELECT * FROM attendance_records WHERE date = :date")
-    fun getAttendanceByDate(date: String): Flow<List<AttendanceRecord>>
-
-    @Query("SELECT * FROM attendance_records WHERE date = :date")
-    suspend fun getAttendanceListByDateSync(date: String): List<AttendanceRecord>
-
-    @Query("SELECT * FROM attendance_records WHERE studentId = :studentId AND date = :date LIMIT 1")
-    suspend fun getRecordForStudent(studentId: Long, date: String): AttendanceRecord?
-
-    @Query("SELECT * FROM attendance_records WHERE studentId = :studentId ORDER BY date DESC")
-    suspend fun getAttendanceForStudentSync(studentId: Long): List<AttendanceRecord>
-
-    @Query("SELECT * FROM attendance_records WHERE (status = 'غائب' OR status = 'متأخر' OR status = 'هارب' OR status = 'ABSENT' OR status = 'LATE' OR status = 'TRUANT') AND isFollowedUp = 0 ORDER BY date DESC")
-    fun getPendingAlerts(): Flow<List<AttendanceRecord>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAttendance(record: AttendanceRecord)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAttendanceList(records: List<AttendanceRecord>)
-
-    @Query("UPDATE attendance_records SET isFollowedUp = 1, followUpMethod = :method, followUpNote = :note WHERE id = :recordId")
-    suspend fun resolveFollowUp(recordId: Long, method: String, note: String)
-}
-
 // واجهة التعامل مع الطلاب
 @Dao
 interface StudentDao {
