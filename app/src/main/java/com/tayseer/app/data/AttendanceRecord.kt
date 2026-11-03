@@ -8,26 +8,26 @@ import androidx.room.PrimaryKey
 data class AttendanceRecord(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "id")
-    val id: Long = 0,
+    val id: Long = 0L,
 
     @ColumnInfo(name = "studentId")
-    val studentId: Long,
+    val studentId: Long = 0L,
 
     @ColumnInfo(name = "date")
-    val date: String,
+    val date: String = "",
 
     @ColumnInfo(name = "status")
-    val status: String,
+    val status: String = "حاضر",
 
     @ColumnInfo(name = "reasonNote")
-    val reasonNote: String? = null,
+    val reasonNote: String = "",
 
     @ColumnInfo(name = "isFollowedUp")
     val isFollowedUp: Boolean = false,
 
     @ColumnInfo(name = "followUpMethod")
-    val followUpMethod: String? = null,
+    val followUpMethod: String = "",
 
     @ColumnInfo(name = "followUpNote")
-    val followUpNote: String? = null
+    val followUpNote: String = ""
 )
