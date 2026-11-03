@@ -1,40 +1,80 @@
 package com.tayseer.app.data
 
 import android.content.Context
-import androidx.room.*
+import androidx.room.ColumnInfo
+import androidx.room.Dao
+import androidx.room.Database
+import androidx.room.Delete
+import androidx.room.Entity
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.PrimaryKey
+import androidx.room.Query
+import androidx.room.Room
+import androidx.room.RoomDatabase
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 // 1. جدول سجلات الحضور والغياب
 @Entity(tableName = "attendance_records")
 data class AttendanceRecord(
     @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
     val id: Long = 0,
-    val studentId: Long,
-    val date: String,
-    val status: String,
-    val reasonNote: String? = null,
+
+    @ColumnInfo(name = "studentId")
+    val studentId: Long = 0,
+
+    @ColumnInfo(name = "date")
+    val date: String = "",
+
+    @ColumnInfo(name = "status")
+    val status: String = "حاضر",
+
+    @ColumnInfo(name = "reasonNote")
+    val reasonNote: String = "",
+
+    @ColumnInfo(name = "isFollowedUp")
     val isFollowedUp: Boolean = false,
-    val followUpMethod: String? = null,
-    val followUpNote: String? = null
+
+    @ColumnInfo(name = "followUpMethod")
+    val followUpMethod: String = "",
+
+    @ColumnInfo(name = "followUpNote")
+    val followUpNote: String = ""
 )
 
 // 2. جدول سجلات التقييم
 @Entity(tableName = "evaluations")
 data class EvaluationRecord(
     @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
     val id: Long = 0,
-    val studentId: Long,
-    val date: String,
-    val evaluationType: String,
-    val note: String? = null
+
+    @ColumnInfo(name = "studentId")
+    val studentId: Long = 0,
+
+    @ColumnInfo(name = "date")
+    val date: String = "",
+
+    @ColumnInfo(name = "evaluationType")
+    val evaluationType: String = "",
+
+    @ColumnInfo(name = "note")
+    val note: String = ""
 )
 
 // 3. جدول التقييمات المخصصة
 @Entity(tableName = "custom_evaluations")
 data class CustomEvaluation(
     @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
     val id: Long = 0,
-    val title: String,
+
+    @ColumnInfo(name = "title")
+    val title: String = "",
+
+    @ColumnInfo(name = "isPositive")
     val isPositive: Boolean = true
 )
 
@@ -53,7 +93,7 @@ interface AttendanceDao {
     @Query("SELECT * FROM attendance_records WHERE studentId = :studentId ORDER BY date DESC")
     suspend fun getAttendanceForStudentSync(studentId: Long): List<AttendanceRecord>
 
-    @Query("SELECT * FROM attendance_records WHERE (status = 'ABSENT' OR status = 'LATE' OR status = 'TRUANT') AND isFollowedUp = 0 ORDER BY date DESC")
+    @Query("SELECT * FROM attendance_records WHERE (status = 'غائب' OR status = 'متأخر' OR status = 'هارب' OR status = 'ABSENT' OR status = 'LATE' OR status = 'TRUANT') AND isFollowedUp = 0 ORDER BY date DESC")
     fun getPendingAlerts(): Flow<List<AttendanceRecord>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
