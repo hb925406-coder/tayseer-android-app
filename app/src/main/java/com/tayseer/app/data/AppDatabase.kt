@@ -8,34 +8,6 @@ import kotlinx.coroutines.flow.Flow
 // 1. الكيانات والجداول (Entities)
 // -------------------------------------------------------------
 
-@Entity(tableName = "attendance_records")
-data class AttendanceRecord(
-    @PrimaryKey(autoGenerate = true)
-    @ColumnInfo(name = "id")
-    val id: Long = 0L,
-
-    @ColumnInfo(name = "studentId")
-    val studentId: Long = 0L,
-
-    @ColumnInfo(name = "date")
-    val date: String = "",
-
-    @ColumnInfo(name = "status")
-    val status: String = "حاضر",
-
-    @ColumnInfo(name = "reasonNote")
-    val reasonNote: String = "",
-
-    @ColumnInfo(name = "isFollowedUp")
-    val isFollowedUp: Boolean = false,
-
-    @ColumnInfo(name = "followUpMethod")
-    val followUpMethod: String = "",
-
-    @ColumnInfo(name = "followUpNote")
-    val followUpNote: String = ""
-)
-
 @Entity(tableName = "evaluations")
 data class EvaluationRecord(
     @PrimaryKey(autoGenerate = true)
@@ -69,7 +41,7 @@ data class CustomEvaluation(
 )
 
 // -------------------------------------------------------------
-// 2. تعريف قاعدة البيانات (يجب أن يسبق الـ DAOs لإنشاء الجداول في KSP)
+// 2. تعريف قاعدة البيانات الكاملة
 // -------------------------------------------------------------
 
 @Database(
