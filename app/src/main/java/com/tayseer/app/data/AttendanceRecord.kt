@@ -19,11 +19,11 @@ data class AttendanceRecord(
     @ColumnInfo(name = "status")
     val status: String = "حاضر",
 
-    @ColumnInfo(name = "reasonNote")
-    val reasonNote: String = "",
+    @ColumnInfo(name = "reason")
+    val reason: String = "",
 
     @ColumnInfo(name = "isFollowedUp")
-    val isFollowedUp: Boolean = false,
+    val isFollowedUp: Boolean = true,
 
     @ColumnInfo(name = "followUpMethod")
     val followUpMethod: String = "",
