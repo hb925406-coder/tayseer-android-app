@@ -41,47 +41,7 @@ data class CustomEvaluation(
 )
 
 // -------------------------------------------------------------
-// 2. تعريف قاعدة البيانات الكاملة
-// -------------------------------------------------------------
-
-@Database(
-    entities = [
-        Student::class,
-        AttendanceRecord::class,
-        EvaluationRecord::class,
-        CustomEvaluation::class
-    ],
-    version = 3,
-    exportSchema = false
-)
-abstract class AppDatabase : RoomDatabase() {
-
-    abstract fun studentDao(): StudentDao
-    abstract fun attendanceDao(): AttendanceDao
-    abstract fun evaluationDao(): EvaluationDao
-
-    companion object {
-        @Volatile
-        private var INSTANCE: AppDatabase? = null
-
-        fun getDatabase(context: Context): AppDatabase {
-            return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "tayseer_database"
-                )
-                    .fallbackToDestructiveMigration()
-                    .build()
-                INSTANCE = instance
-                instance
-            }
-        }
-    }
-}
-
-// -------------------------------------------------------------
-// 3. واجهات العمليات (DAOs)
+// 2. واجهات العمليات (DAOs)
 // -------------------------------------------------------------
 
 @Dao
@@ -98,7 +58,7 @@ interface AttendanceDao {
     @Query("SELECT * FROM attendance_records WHERE studentId = :studentId ORDER BY date DESC")
     suspend fun getAttendanceForStudentSync(studentId: Long): List<AttendanceRecord>
 
-    @Query("SELECT * FROM attendance_records WHERE (status = 'غائب' OR status = 'متأخر' OR status = 'هارب' OR status = 'ABSENT' OR status = 'LATE' OR status = 'TRUANT') AND isFollowedUp = 0 ORDER BY date DESC")
+    @Query("SELECT * FROM attendance_records WHERE isFollowedUp = 0 ORDER BY date DESC")
     fun getPendingAlerts(): Flow<List<AttendanceRecord>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -163,4 +123,44 @@ interface EvaluationDao {
 
     @Delete
     suspend fun deleteCustomEvaluation(evaluation: CustomEvaluation)
+}
+
+// -------------------------------------------------------------
+// 3. تعريف قاعدة البيانات الكاملة
+// -------------------------------------------------------------
+
+@Database(
+    entities = [
+        Student::class,
+        AttendanceRecord::class,
+        EvaluationRecord::class,
+        CustomEvaluation::class
+    ],
+    version = 3,
+    exportSchema = false
+)
+abstract class AppDatabase : RoomDatabase() {
+
+    abstract fun studentDao(): StudentDao
+    abstract fun attendanceDao(): AttendanceDao
+    abstract fun evaluationDao(): EvaluationDao
+
+    companion object {
+        @Volatile
+        private var INSTANCE: AppDatabase? = null
+
+        fun getDatabase(context: Context): AppDatabase {
+            return INSTANCE ?: synchronized(this) {
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "tayseer_database"
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
+                INSTANCE = instance
+                instance
+            }
+        }
+    }
 }
