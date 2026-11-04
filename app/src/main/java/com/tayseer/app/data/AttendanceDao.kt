@@ -1,24 +1,16 @@
 package com.tayseer.app.data
 
 import androidx.room.*
+import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface AttendanceDao {
-    @Query("SELECT * FROM attendance_records WHERE date = :date")
-    fun getAttendanceByDate(date: String): Flow<List<AttendanceRecord>>
+    @RawQuery(observedEntities = [AttendanceRecord::class])
+    fun getAttendanceRaw(query: SupportSQLiteQuery): Flow<List<AttendanceRecord>>
 
-    @Query("SELECT * FROM attendance_records WHERE date = :date")
-    suspend fun getAttendanceListByDateSync(date: String): List<AttendanceRecord>
-
-    @Query("SELECT * FROM attendance_records WHERE studentId = :studentId AND date = :date LIMIT 1")
-    suspend fun getRecordForStudent(studentId: Long, date: String): AttendanceRecord?
-
-    @Query("SELECT * FROM attendance_records WHERE studentId = :studentId ORDER BY date DESC")
-    suspend fun getAttendanceForStudentSync(studentId: Long): List<AttendanceRecord>
-
-    @Query("SELECT * FROM attendance_records WHERE isFollowedUp = 0 ORDER BY date DESC")
-    fun getPendingAlerts(): Flow<List<AttendanceRecord>>
+    @RawQuery
+    suspend fun getAttendanceRawSync(query: SupportSQLiteQuery): List<AttendanceRecord>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAttendance(record: AttendanceRecord)
@@ -26,6 +18,9 @@ interface AttendanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAttendanceList(records: List<AttendanceRecord>)
 
-    @Query("UPDATE attendance_records SET isFollowedUp = 1, followUpMethod = :method, followUpNote = :note WHERE id = :recordId")
-    suspend fun resolveFollowUp(recordId: Long, method: String, note: String)
+    @Update
+    suspend fun updateAttendance(record: AttendanceRecord)
+
+    @Delete
+    suspend fun deleteAttendance(record: AttendanceRecord)
 }
