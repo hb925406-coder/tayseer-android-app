@@ -41,7 +41,7 @@ data class CustomEvaluation(
 )
 
 // -------------------------------------------------------------
-// 2. تعريف قاعدة البيانات (في البداية ليقوم KSP ببناء الجداول فوراً)
+// 2. تعريف قاعدة البيانات الكاملة
 // -------------------------------------------------------------
 
 @Database(
@@ -81,35 +81,8 @@ abstract class AppDatabase : RoomDatabase() {
 }
 
 // -------------------------------------------------------------
-// 3. واجهات العمليات (DAOs تأتي بعد Database)
+// 3. واجهات العمليات (DAOs)
 // -------------------------------------------------------------
-
-@Dao
-interface AttendanceDao {
-    @Query("SELECT * FROM attendance_records WHERE date = :date")
-    fun getAttendanceByDate(date: String): Flow<List<AttendanceRecord>>
-
-    @Query("SELECT * FROM attendance_records WHERE date = :date")
-    suspend fun getAttendanceListByDateSync(date: String): List<AttendanceRecord>
-
-    @Query("SELECT * FROM attendance_records WHERE studentId = :studentId AND date = :date LIMIT 1")
-    suspend fun getRecordForStudent(studentId: Long, date: String): AttendanceRecord?
-
-    @Query("SELECT * FROM attendance_records WHERE studentId = :studentId ORDER BY date DESC")
-    suspend fun getAttendanceForStudentSync(studentId: Long): List<AttendanceRecord>
-
-    @Query("SELECT * FROM attendance_records WHERE isFollowedUp = 0 ORDER BY date DESC")
-    fun getPendingAlerts(): Flow<List<AttendanceRecord>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAttendance(record: AttendanceRecord)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAttendanceList(records: List<AttendanceRecord>)
-
-    @Query("UPDATE attendance_records SET isFollowedUp = 1, followUpMethod = :method, followUpNote = :note WHERE id = :recordId")
-    suspend fun resolveFollowUp(recordId: Long, method: String, note: String)
-}
 
 @Dao
 interface StudentDao {
