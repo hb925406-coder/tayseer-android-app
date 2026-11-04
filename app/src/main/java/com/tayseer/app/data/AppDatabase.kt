@@ -5,7 +5,7 @@ import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
 // -------------------------------------------------------------
-// 1. الكيانات والجداول (Entities)
+// 1. الكيانات الإضافية (Entities)
 // -------------------------------------------------------------
 
 @Entity(tableName = "evaluations")
@@ -41,7 +41,47 @@ data class CustomEvaluation(
 )
 
 // -------------------------------------------------------------
-// 2. واجهات العمليات (DAOs)
+// 2. تعريف قاعدة البيانات (في البداية ليقوم KSP ببناء الجداول فوراً)
+// -------------------------------------------------------------
+
+@Database(
+    entities = [
+        Student::class,
+        AttendanceRecord::class,
+        EvaluationRecord::class,
+        CustomEvaluation::class
+    ],
+    version = 3,
+    exportSchema = false
+)
+abstract class AppDatabase : RoomDatabase() {
+
+    abstract fun studentDao(): StudentDao
+    abstract fun attendanceDao(): AttendanceDao
+    abstract fun evaluationDao(): EvaluationDao
+
+    companion object {
+        @Volatile
+        private var INSTANCE: AppDatabase? = null
+
+        fun getDatabase(context: Context): AppDatabase {
+            return INSTANCE ?: synchronized(this) {
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "tayseer_database"
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
+                INSTANCE = instance
+                instance
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// 3. واجهات العمليات (DAOs تأتي بعد Database)
 // -------------------------------------------------------------
 
 @Dao
@@ -123,44 +163,4 @@ interface EvaluationDao {
 
     @Delete
     suspend fun deleteCustomEvaluation(evaluation: CustomEvaluation)
-}
-
-// -------------------------------------------------------------
-// 3. تعريف قاعدة البيانات الكاملة
-// -------------------------------------------------------------
-
-@Database(
-    entities = [
-        Student::class,
-        AttendanceRecord::class,
-        EvaluationRecord::class,
-        CustomEvaluation::class
-    ],
-    version = 3,
-    exportSchema = false
-)
-abstract class AppDatabase : RoomDatabase() {
-
-    abstract fun studentDao(): StudentDao
-    abstract fun attendanceDao(): AttendanceDao
-    abstract fun evaluationDao(): EvaluationDao
-
-    companion object {
-        @Volatile
-        private var INSTANCE: AppDatabase? = null
-
-        fun getDatabase(context: Context): AppDatabase {
-            return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "tayseer_database"
-                )
-                    .fallbackToDestructiveMigration()
-                    .build()
-                INSTANCE = instance
-                instance
-            }
-        }
-    }
 }
