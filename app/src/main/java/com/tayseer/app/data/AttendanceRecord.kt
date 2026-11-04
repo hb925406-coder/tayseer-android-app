@@ -1,17 +1,33 @@
 package com.tayseer.app.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "attendance_records")
 data class AttendanceRecord(
     @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
-    val studentId: Long = 0,
+    @ColumnInfo(name = "id")
+    val id: Long = 0L,
+
+    @ColumnInfo(name = "studentId")
+    val studentId: Long = 0L,
+
+    @ColumnInfo(name = "date")
     val date: String = "",
+
+    @ColumnInfo(name = "status")
     val status: String = "حاضر",
+
+    @ColumnInfo(name = "reasonNote")
     val reasonNote: String = "",
+
+    @ColumnInfo(name = "isFollowedUp")
     val isFollowedUp: Boolean = false,
+
+    @ColumnInfo(name = "followUpMethod")
     val followUpMethod: String = "",
+
+    @ColumnInfo(name = "followUpNote")
     val followUpNote: String = ""
 )
