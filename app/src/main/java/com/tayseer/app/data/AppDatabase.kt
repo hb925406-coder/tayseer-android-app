@@ -1,48 +1,9 @@
 package com.tayseer.app.data
 
 import android.content.Context
-import androidx.room.*
-import kotlinx.coroutines.flow.Flow
-
-// -------------------------------------------------------------
-// 1. الكيانات الإضافية (Entities)
-// -------------------------------------------------------------
-
-@Entity(tableName = "evaluations")
-data class EvaluationRecord(
-    @PrimaryKey(autoGenerate = true)
-    @ColumnInfo(name = "id")
-    val id: Long = 0L,
-
-    @ColumnInfo(name = "studentId")
-    val studentId: Long = 0L,
-
-    @ColumnInfo(name = "date")
-    val date: String = "",
-
-    @ColumnInfo(name = "evaluationType")
-    val evaluationType: String = "",
-
-    @ColumnInfo(name = "note")
-    val note: String = ""
-)
-
-@Entity(tableName = "custom_evaluations")
-data class CustomEvaluation(
-    @PrimaryKey(autoGenerate = true)
-    @ColumnInfo(name = "id")
-    val id: Long = 0L,
-
-    @ColumnInfo(name = "title")
-    val title: String = "",
-
-    @ColumnInfo(name = "isPositive")
-    val isPositive: Boolean = true
-)
-
-// -------------------------------------------------------------
-// 2. تعريف قاعدة البيانات الكاملة
-// -------------------------------------------------------------
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
 
 @Database(
     entities = [
@@ -51,7 +12,7 @@ data class CustomEvaluation(
         EvaluationRecord::class,
         CustomEvaluation::class
     ],
-    version = 3,
+    version = 1,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -59,6 +20,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun studentDao(): StudentDao
     abstract fun attendanceDao(): AttendanceDao
     abstract fun evaluationDao(): EvaluationDao
+    abstract fun customEvaluationDao(): CustomEvaluationDao
 
     companion object {
         @Volatile
@@ -71,69 +33,11 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "tayseer_database"
                 )
-                    .fallbackToDestructiveMigration()
-                    .build()
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }
         }
     }
-}
-
-// -------------------------------------------------------------
-// 3. واجهات العمليات (DAOs)
-// -------------------------------------------------------------
-
-@Dao
-interface StudentDao {
-    @Query("SELECT * FROM students WHERE isArchived = 0 ORDER BY name ASC")
-    fun getAllActiveStudents(): Flow<List<Student>>
-
-    @Query("SELECT * FROM students ORDER BY name ASC")
-    fun getAllStudents(): Flow<List<Student>>
-
-    @Query("SELECT * FROM students WHERE academicYear = :year AND isArchived = 0 ORDER BY name ASC")
-    fun getStudentsByYear(year: String): Flow<List<Student>>
-
-    @Query("SELECT DISTINCT section FROM students WHERE isArchived = 0 ORDER BY section ASC")
-    fun getActiveSections(): Flow<List<String>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertStudent(student: Student): Long
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertStudents(students: List<Student>)
-
-    @Update
-    suspend fun updateStudent(student: Student)
-
-    @Delete
-    suspend fun deleteStudent(student: Student)
-
-    @Query("UPDATE students SET isArchived = 1 WHERE id = :studentId")
-    suspend fun archiveStudent(studentId: Long)
-
-    @Query("UPDATE students SET isArchived = 1 WHERE academicYear = :currentYear")
-    suspend fun archiveCurrentYearStudents(currentYear: String)
-}
-
-@Dao
-interface EvaluationDao {
-    @Query("SELECT * FROM evaluations WHERE studentId = :studentId ORDER BY date DESC")
-    fun getEvaluationsForStudent(studentId: Long): Flow<List<EvaluationRecord>>
-
-    @Query("SELECT * FROM evaluations WHERE studentId = :studentId ORDER BY date DESC")
-    suspend fun getEvaluationsForStudentSync(studentId: Long): List<EvaluationRecord>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertEvaluation(evaluation: EvaluationRecord)
-
-    @Query("SELECT * FROM custom_evaluations ORDER BY id ASC")
-    fun getAllCustomEvaluations(): Flow<List<CustomEvaluation>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCustomEvaluation(evaluation: CustomEvaluation)
-
-    @Delete
-    suspend fun deleteCustomEvaluation(evaluation: CustomEvaluation)
 }
