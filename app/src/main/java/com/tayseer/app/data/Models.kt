@@ -4,151 +4,61 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-enum class Role {
-    ADMIN,
-    TEACHER,
-    PARENT
-}
-
-enum class AttendanceStatus(val arabicLabel: String) {
+enum class AttendanceStatus(val label: String) {
     PRESENT("حاضر"),
     ABSENT("غائب"),
     EXCUSED("مستأذن"),
     LATE("متأخر"),
     ABSENT_WITH_EXCUSE("غائب بعذر"),
-    TRUANT("هارب");
-
-    val arabicTitle: String
-        get() = arabicLabel
+    ESCAPED("هارب")
 }
 
-@Entity(tableName = "users")
-data class User(
-    @PrimaryKey(autoGenerate = true)
-    @ColumnInfo(name = "id")
-    val id: Long = 0,
-
-    @ColumnInfo(name = "username")
-    val username: String = "",
-
-    @ColumnInfo(name = "passwordHash")
-    val passwordHash: String = "",
-
-    @ColumnInfo(name = "role")
-    val role: String = "ADMIN",
-
-    @ColumnInfo(name = "assignedSection")
-    val assignedSection: String = "",
-
-    @ColumnInfo(name = "assignedSubject")
-    val assignedSubject: String = "",
-
-    @ColumnInfo(name = "studentId")
-    val studentId: Long? = null
-) {
-    val roleEnum: Role
-        get() = try {
-            Role.valueOf(role)
-        } catch (e: Exception) {
-            Role.ADMIN
-        }
+enum class UserRole {
+    ADMIN,
+    TEACHER,
+    PARENT
 }
 
 @Entity(tableName = "students")
 data class Student(
     @PrimaryKey(autoGenerate = true)
-    @ColumnInfo(name = "id")
-    val id: Long = 0,
-
-    @ColumnInfo(name = "name")
-    val name: String = "",
-
-    @ColumnInfo(name = "grade")
-    val grade: String = "",
-
-    @ColumnInfo(name = "section")
-    val section: String = "",
-
-    @ColumnInfo(name = "groupName")
-    val groupName: String = "",
-
-    @ColumnInfo(name = "parentPhone")
+    val id: Long = 0L,
+    val name: String,
+    val grade: String,
+    val section: String,
+    val academicYear: String = "1446-1447",
     val parentPhone: String = "",
+    val isArchived: Boolean = false
+)
 
-    @ColumnInfo(name = "isActive")
-    val isActive: Boolean = true
-) {
-    val isArchived: Boolean
-        get() = !isActive
-}
-
-@Entity(tableName = "attendance")
+@Entity(tableName = "attendance_records")
 data class AttendanceRecord(
     @PrimaryKey(autoGenerate = true)
-    @ColumnInfo(name = "id")
-    val id: Long = 0,
-
-    @ColumnInfo(name = "studentId")
-    val studentId: Long = 0,
-
-    @ColumnInfo(name = "date")
-    val date: String = "",
-
-    @ColumnInfo(name = "status")
-    val status: String = "حاضر",
-
-    @ColumnInfo(name = "reasonNote")
+    val id: Long = 0L,
+    val studentId: Long,
+    val date: String,
+    val statusEnum: AttendanceStatus = AttendanceStatus.PRESENT,
     val reasonNote: String = "",
+    val isFollowedUp: Boolean = true,
+    val followUpMethod: String = "",
+    val followUpNote: String = ""
+)
 
-    @ColumnInfo(name = "excuseType")
-    val excuseType: String = "",
-
-    @ColumnInfo(name = "excuseReason")
-    val excuseReason: String = "",
-
-    @ColumnInfo(name = "isResolved")
-    val isResolved: Boolean = false
-) {
-    val statusEnum: AttendanceStatus
-        get() = when (status) {
-            "حاضر", "PRESENT" -> AttendanceStatus.PRESENT
-            "غائب", "ABSENT" -> AttendanceStatus.ABSENT
-            "مستأذن", "EXCUSED" -> AttendanceStatus.EXCUSED
-            "متأخر", "LATE" -> AttendanceStatus.LATE
-            "غائب بعذر", "ABSENT_WITH_EXCUSE" -> AttendanceStatus.ABSENT_WITH_EXCUSE
-            "هارب", "TRUANT", "ESCAPED" -> AttendanceStatus.TRUANT
-            else -> AttendanceStatus.PRESENT
-        }
-}
+@Entity(tableName = "evaluation_records")
+data class EvaluationRecord(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0L,
+    val studentId: Long,
+    val date: String,
+    val title: String,
+    val scoreType: String,
+    val note: String = ""
+)
 
 @Entity(tableName = "custom_evaluations")
 data class CustomEvaluation(
     @PrimaryKey(autoGenerate = true)
-    @ColumnInfo(name = "id")
-    val id: Long = 0,
-
-    @ColumnInfo(name = "title")
-    val title: String = "",
-
-    @ColumnInfo(name = "isPositive")
+    val id: Long = 0L,
+    val title: String,
     val isPositive: Boolean = true
-)
-
-@Entity(tableName = "evaluations")
-data class EvaluationRecord(
-    @PrimaryKey(autoGenerate = true)
-    @ColumnInfo(name = "id")
-    val id: Long = 0,
-
-    @ColumnInfo(name = "studentId")
-    val studentId: Long = 0,
-
-    @ColumnInfo(name = "date")
-    val date: String = "",
-
-    @ColumnInfo(name = "evaluationType")
-    val evaluationType: String = "",
-
-    @ColumnInfo(name = "note")
-    val note: String = ""
 )
